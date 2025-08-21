@@ -11,7 +11,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 
 interface CreateEventDialogProps {
@@ -59,32 +58,27 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
     setIsSubmitting(true);
     
     try {
-      // First get the host record
-      const { data: hostData, error: hostError } = await supabase
-        .from('hosts')
-        .select('id')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-        .single();
-
-      if (hostError) {
-        console.error('Host error:', hostError);
-        throw new Error('Unable to find host profile');
-      }
-
       // Combine date and time
       const dateTime = new Date(`${formData.date}T${formData.time}`);
       
-      const { error } = await supabase
-        .from('events')
-        .insert({
-          host_id: hostData.id,
+      const response = await fetch('/api/events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
           title: formData.title,
-          description: formData.description,
-          date_time: dateTime.toISOString(),
-          location: formData.location,
-        });
+          description: formData.description || null,
+          dateTime: dateTime.toISOString(),
+          location: formData.location || null,
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create event');
+      }
 
       toast({
         title: "Event Created",

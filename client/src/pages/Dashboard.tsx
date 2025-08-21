@@ -5,15 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { CreateEventDialog } from '@/components/CreateEventDialog';
 
 interface Event {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   date_time: string;
-  location: string;
+  location: string | null;
   created_at: string;
 }
 
@@ -31,20 +30,22 @@ const Dashboard = () => {
 
   const fetchEvents = async () => {
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .select(`
-          id,
-          title,
-          description,
-          date_time,
-          location,
-          created_at
-        `)
-        .order('date_time', { ascending: true });
+      const response = await fetch('/api/events', {
+        credentials: 'include',
+      });
 
-      if (error) throw error;
-      setEvents(data || []);
+      if (response.ok) {
+        const data = await response.json();
+        // Convert date_time field names to match our API response format
+        const formattedEvents = data.map((event: any) => ({
+          ...event,
+          date_time: event.dateTime,
+          created_at: event.createdAt,
+        }));
+        setEvents(formattedEvents);
+      } else {
+        console.error('Error fetching events:', response.statusText);
+      }
     } catch (error) {
       console.error('Error fetching events:', error);
     } finally {
