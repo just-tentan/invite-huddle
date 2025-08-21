@@ -66,8 +66,9 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export const insertEventSchema = createInsertSchema(events).pick({
   title: true,
   description: true,
-  dateTime: true,
   location: true,
+}).extend({
+  dateTime: z.string().transform((str) => new Date(str)),
 });
 
 export const insertInvitationSchema = createInsertSchema(invitations).pick({

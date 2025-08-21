@@ -118,7 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         host.id,
         title,
         description || null,
-        new Date(dateTime),
+        dateTime, // dateTime is already transformed to Date by schema
         location || null
       );
       
