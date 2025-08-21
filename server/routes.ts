@@ -107,7 +107,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/events", requireAuth, async (req: any, res) => {
     try {
-      const { title, description, dateTime, location } = insertEventSchema.parse(req.body);
+      console.log("Received body:", JSON.stringify(req.body, null, 2));
+      const parsed = insertEventSchema.parse(req.body);
+      console.log("Parsed data:", JSON.stringify(parsed, null, 2));
+      const { title, description, dateTime, location } = parsed;
       
       const host = await storage.getHostByUserId(req.user.id);
       if (!host) {
@@ -124,6 +127,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(event);
     } catch (error: any) {
+      console.log("Full validation error:", error);
+      if (error.errors) {
+        console.log("Zod errors:", JSON.stringify(error.errors, null, 2));
+      }
       res.status(400).json({ error: error.message });
     }
   });
