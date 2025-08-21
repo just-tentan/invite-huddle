@@ -107,10 +107,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/events", requireAuth, async (req: any, res) => {
     try {
-      console.log("Received body:", JSON.stringify(req.body, null, 2));
-      const parsed = insertEventSchema.parse(req.body);
-      console.log("Parsed data:", JSON.stringify(parsed, null, 2));
-      const { title, description, dateTime, location } = parsed;
+      const { title, description, dateTime, location, emails } = req.body;
+      const eventData = { title, description, dateTime, location };
+      const parsed = insertEventSchema.parse(eventData);
       
       const host = await storage.getHostByUserId(req.user.id);
       if (!host) {
@@ -119,18 +118,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const event = await storage.createEvent(
         host.id,
-        title,
-        description || null,
-        dateTime, // dateTime is already transformed to Date by schema
-        location || null
+        parsed.title,
+        parsed.description || null,
+        parsed.dateTime,
+        parsed.location || null
       );
-      
-      res.json(event);
-    } catch (error: any) {
-      console.log("Full validation error:", error);
-      if (error.errors) {
-        console.log("Zod errors:", JSON.stringify(error.errors, null, 2));
+
+      // Create invitations if emails are provided
+      const invitations = [];
+      if (emails && Array.isArray(emails) && emails.length > 0) {
+        for (const email of emails) {
+          if (email.trim()) {
+            const invitation = await storage.createInvitation(event.id, email.trim());
+            invitations.push(invitation);
+          }
+        }
       }
+      
+      res.json({ event, invitations });
+    } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
   });
@@ -206,6 +212,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.updateInvitationRSVP(req.params.token, rsvpStatus);
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Event messages routes
+  app.get("/api/events/:id/messages", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (token) {
+        // Guest access via invitation token
+        const invitation = await storage.getInvitationByToken(token as string);
+        if (!invitation || invitation.eventId !== req.params.id) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      } else {
+        // Host access - requires authentication
+        if (!req.session.userId) {
+          return res.status(401).json({ error: "Authentication required" });
+        }
+        
+        const user = await storage.getUserById(req.session.userId);
+        if (!user) {
+          return res.status(401).json({ error: "User not found" });
+        }
+
+        const event = await storage.getEventById(req.params.id);
+        if (!event) {
+          return res.status(404).json({ error: "Event not found" });
+        }
+
+        const host = await storage.getHostByUserId(user.id);
+        if (!host || event.hostId !== host.id) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
+      const messages = await storage.getEventMessages(req.params.id);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/events/:id/messages", async (req, res) => {
+    try {
+      const { message, token } = req.body;
+      
+      if (!message || !message.trim()) {
+        return res.status(400).json({ error: "Message is required" });
+      }
+
+      let senderType: "host" | "guest";
+      let senderId: string | null = null;
+
+      if (token) {
+        // Guest message via invitation token
+        const invitation = await storage.getInvitationByToken(token);
+        if (!invitation || invitation.eventId !== req.params.id) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+        senderType = "guest";
+        senderId = invitation.id;
+      } else {
+        // Host message - requires authentication
+        if (!req.session.userId) {
+          return res.status(401).json({ error: "Authentication required" });
+        }
+        
+        const user = await storage.getUserById(req.session.userId);
+        if (!user) {
+          return res.status(401).json({ error: "User not found" });
+        }
+
+        const event = await storage.getEventById(req.params.id);
+        if (!event) {
+          return res.status(404).json({ error: "Event not found" });
+        }
+
+        const host = await storage.getHostByUserId(user.id);
+        if (!host || event.hostId !== host.id) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+
+        senderType = "host";
+        senderId = host.id;
+      }
+
+      const newMessage = await storage.createEventMessage(
+        req.params.id,
+        senderType,
+        senderId,
+        message.trim()
+      );
+
+      res.json(newMessage);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }

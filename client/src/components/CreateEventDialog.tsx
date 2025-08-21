@@ -11,6 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Plus, Minus } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 
 interface CreateEventDialogProps {
@@ -26,6 +27,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
     date: '',
     time: '',
     location: '',
+    emails: [''],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -40,7 +42,26 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
       date: '',
       time: '',
       location: '',
+      emails: [''],
     });
+  };
+
+  const addEmailField = () => {
+    setFormData(prev => ({ ...prev, emails: [...prev.emails, ''] }));
+  };
+
+  const removeEmailField = (index: number) => {
+    setFormData(prev => ({ 
+      ...prev, 
+      emails: prev.emails.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateEmail = (index: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      emails: prev.emails.map((email, i) => i === index ? value : email)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,6 +93,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
           description: formData.description || null,
           dateTime: dateTime.toISOString(),
           location: formData.location || null,
+          emails: formData.emails.filter(email => email.trim()),
         }),
       });
 
@@ -165,6 +187,45 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
               value={formData.location}
               onChange={(e) => handleInputChange('location', e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Guest Email Invitations</Label>
+            <div className="space-y-2">
+              {formData.emails.map((email, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    placeholder="guest@example.com"
+                    value={email}
+                    onChange={(e) => updateEmail(index, e.target.value)}
+                    type="email"
+                  />
+                  {formData.emails.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => removeEmailField(index)}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {index === formData.emails.length - 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={addEmailField}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Add email addresses to send invitations. Guests can RSVP without creating an account.
+            </p>
           </div>
           
           <DialogFooter>
