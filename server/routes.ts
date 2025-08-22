@@ -266,6 +266,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resend invitations for an event
+  app.post("/api/events/:id/resend-invitations", requireAuth, async (req: any, res) => {
+    try {
+      const event = await storage.getEventById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const invitations = await storage.getInvitationsByEventId(req.params.id);
+      let sentCount = 0;
+
+      for (const invitation of invitations) {
+        if (invitation.email) {
+          const inviteUrl = `${req.protocol}://${req.get('host')}/invite/${invitation.token}`;
+          const formatDate = (dateString: Date) => {
+            return new Date(dateString).toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          };
+
+          try {
+            await sendInvitationEmail({
+              to: invitation.email,
+              eventTitle: event.title,
+              eventDescription: event.description || undefined,
+              eventDate: formatDate(event.dateTime),
+              eventLocation: event.location || undefined,
+              inviteUrl,
+              hostEmail: req.user.email
+            });
+            sentCount++;
+          } catch (error) {
+            console.error(`Failed to resend invitation to ${invitation.email}:`, error);
+          }
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        message: `${sentCount} invitations resent successfully` 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Add new invitations to an event
+  app.post("/api/events/:id/add-invitations", requireAuth, async (req: any, res) => {
+    try {
+      const { emails } = req.body;
+
+      if (!emails || !Array.isArray(emails) || emails.length === 0) {
+        return res.status(400).json({ error: "Email addresses are required" });
+      }
+
+      const event = await storage.getEventById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Check for existing invitations to avoid duplicates
+      const existingInvitations = await storage.getInvitationsByEventId(req.params.id);
+      const existingEmails = new Set(existingInvitations.map(inv => inv.email).filter(Boolean));
+
+      const newInvitations = [];
+      for (const email of emails) {
+        if (email.trim() && !existingEmails.has(email.trim())) {
+          const invitation = await storage.createInvitation(event.id, email.trim());
+          newInvitations.push(invitation);
+
+          // Send invitation email
+          const inviteUrl = `${req.protocol}://${req.get('host')}/invite/${invitation.token}`;
+          const formatDate = (dateString: Date) => {
+            return new Date(dateString).toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          };
+
+          try {
+            await sendInvitationEmail({
+              to: email.trim(),
+              eventTitle: event.title,
+              eventDescription: event.description || undefined,
+              eventDate: formatDate(event.dateTime),
+              eventLocation: event.location || undefined,
+              inviteUrl,
+              hostEmail: req.user.email
+            });
+          } catch (error) {
+            console.error(`Failed to send invitation to ${email}:`, error);
+          }
+        }
+      }
+
+      res.json({ invitations: newInvitations });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Event messages routes
   app.get("/api/events/:id/messages", async (req, res) => {
     try {

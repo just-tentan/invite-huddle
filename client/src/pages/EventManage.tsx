@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
-import { Calendar, MapPin, Users, MessageCircle, ArrowLeft, Copy, CheckCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, MessageCircle, ArrowLeft, Copy, CheckCircle, Mail, Plus, Send, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { EventChat } from '@/components/EventChat';
@@ -29,6 +32,9 @@ const EventManage = () => {
   const [event, setEvent] = useState<Event | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loadingEvent, setLoadingEvent] = useState(true);
+  const [isAddingInvitations, setIsAddingInvitations] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [newEmails, setNewEmails] = useState(['']);
 
   useEffect(() => {
     if (user && id) {
@@ -95,6 +101,101 @@ const EventManage = () => {
       maybe: invitations.filter(i => i.rsvpStatus === 'maybe').length,
       pending: invitations.filter(i => i.rsvpStatus === 'pending').length
     };
+  };
+
+  const resendInvitations = async () => {
+    if (!id) return;
+    
+    setIsResending(true);
+    try {
+      const response = await fetch(`/api/events/${id}/resend-invitations`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Invitations Sent",
+          description: "All invitation emails have been resent successfully.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to resend invitations. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  const addNewInvitations = async () => {
+    if (!id) return;
+
+    const validEmails = newEmails.filter(email => email.trim() && email.includes('@'));
+    if (validEmails.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please enter at least one valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAddingInvitations(true);
+    try {
+      const response = await fetch(`/api/events/${id}/add-invitations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ emails: validEmails }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast({
+          title: "Invitations Added",
+          description: `${result.invitations.length} new invitations sent successfully.`,
+        });
+        setNewEmails(['']);
+        fetchEventData(); // Refresh the invitations list
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to add invitations. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingInvitations(false);
+    }
+  };
+
+  const addEmailField = () => {
+    setNewEmails(prev => [...prev, '']);
+  };
+
+  const removeEmailField = (index: number) => {
+    setNewEmails(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateEmail = (index: number, value: string) => {
+    setNewEmails(prev => prev.map((email, i) => i === index ? value : email));
   };
 
   if (loading || loadingEvent) {
@@ -223,10 +324,86 @@ const EventManage = () => {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Invitations</CardTitle>
-                <CardDescription>
-                  Manage your event invitations
-                </CardDescription>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle>Invitations</CardTitle>
+                    <CardDescription>
+                      Manage your event invitations
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={resendInvitations}
+                      disabled={isResending || invitations.length === 0}
+                    >
+                      <Send className="h-3 w-3 mr-1" />
+                      {isResending ? 'Sending...' : 'Resend All'}
+                    </Button>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add Guests
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Add New Invitations</DialogTitle>
+                          <DialogDescription>
+                            Add email addresses to send new invitations for this event.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Guest Email Addresses</Label>
+                            {newEmails.map((email, index) => (
+                              <div key={index} className="flex gap-2">
+                                <Input
+                                  placeholder="guest@example.com"
+                                  value={email}
+                                  onChange={(e) => updateEmail(index, e.target.value)}
+                                  type="email"
+                                />
+                                {newEmails.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => removeEmailField(index)}
+                                  >
+                                    <Minus className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {index === newEmails.length - 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={addEmailField}
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            onClick={addNewInvitations}
+                            disabled={isAddingInvitations}
+                            className="w-full"
+                          >
+                            <Mail className="h-4 w-4 mr-2" />
+                            {isAddingInvitations ? 'Sending...' : 'Send Invitations'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {invitations.length === 0 ? (
