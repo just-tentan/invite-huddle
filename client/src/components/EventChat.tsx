@@ -15,10 +15,10 @@ interface EventMessage {
 
 interface EventChatProps {
   eventId: string;
-  invitationToken: string;
+  invitationToken?: string;
 }
 
-export const EventChat = ({ eventId, invitationToken }: EventChatProps) => {
+export const EventChat = ({ eventId, invitationToken = "" }: EventChatProps) => {
   const [messages, setMessages] = useState<EventMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,10 @@ export const EventChat = ({ eventId, invitationToken }: EventChatProps) => {
 
   const fetchMessages = async () => {
     try {
-      const response = await fetch(`/api/events/${eventId}/messages?token=${invitationToken}`, {
+      const url = invitationToken 
+        ? `/api/events/${eventId}/messages?token=${invitationToken}`
+        : `/api/events/${eventId}/messages`;
+      const response = await fetch(url, {
         credentials: 'include',
       });
 
@@ -62,7 +65,7 @@ export const EventChat = ({ eventId, invitationToken }: EventChatProps) => {
         credentials: 'include',
         body: JSON.stringify({
           message: newMessage.trim(),
-          token: invitationToken,
+          ...(invitationToken && { token: invitationToken }),
         }),
       });
 

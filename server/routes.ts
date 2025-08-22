@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
 import { insertUserSchema, insertEventSchema } from "@shared/schema";
+import { sendInvitationEmail } from "./email";
 
 // Session middleware setup
 declare module "express-session" {
@@ -131,6 +132,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (email.trim()) {
             const invitation = await storage.createInvitation(event.id, email.trim());
             invitations.push(invitation);
+            
+            // Send invitation email
+            const inviteUrl = `${req.protocol}://${req.get('host')}/invite/${invitation.token}`;
+            const formatDate = (dateString: Date) => {
+              return new Date(dateString).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+            };
+
+            try {
+              await sendInvitationEmail({
+                to: email.trim(),
+                eventTitle: parsed.title,
+                eventDescription: parsed.description || undefined,
+                eventDate: formatDate(parsed.dateTime),
+                eventLocation: parsed.location || undefined,
+                inviteUrl,
+                hostEmail: req.user.email
+              });
+            } catch (error) {
+              console.error(`Failed to send invitation to ${email}:`, error);
+              // Continue processing other emails even if one fails
+            }
           }
         }
       }
@@ -214,6 +243,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get event invitations (for event management page)
+  app.get("/api/events/:id/invitations", requireAuth, async (req: any, res) => {
+    try {
+      const event = await storage.getEventById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const invitations = await storage.getInvitationsByEventId(req.params.id);
+      res.json(invitations);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { Plus, Calendar, Users, MessageCircle, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -168,9 +168,11 @@ const Dashboard = () => {
                         0 messages
                       </span>
                     </div>
-                    <Button variant="outline" size="sm">
-                      Manage
-                    </Button>
+                    <Link to={`/events/${event.id}/manage`}>
+                      <Button variant="outline" size="sm">
+                        Manage
+                      </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
