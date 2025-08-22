@@ -27,7 +27,7 @@ export async function sendInvitationEmail({
 }: InvitationEmailParams): Promise<boolean> {
   try {
     const { data, error } = await resend.emails.send({
-      from: `EventHost <noreply@eventhost.com>`,
+      from: `EventHost <onboarding@resend.dev>`,
       to: [to],
       subject: `You're invited to ${eventTitle}`,
       html: `

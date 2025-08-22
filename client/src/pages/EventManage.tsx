@@ -34,6 +34,7 @@ const EventManage = () => {
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [isAddingInvitations, setIsAddingInvitations] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [resendingInvitations, setResendingInvitations] = useState<Set<string>>(new Set());
   const [newEmails, setNewEmails] = useState(['']);
 
   useEffect(() => {
@@ -103,6 +104,10 @@ const EventManage = () => {
     };
   };
 
+  const getPendingInvitationsCount = () => {
+    return invitations.filter(i => i.rsvpStatus === 'pending').length;
+  };
+
   const resendInvitations = async () => {
     if (!id) return;
     
@@ -114,9 +119,10 @@ const EventManage = () => {
       });
 
       if (response.ok) {
+        const result = await response.json();
         toast({
           title: "Invitations Sent",
-          description: "All invitation emails have been resent successfully.",
+          description: result.message || "Pending invitation emails have been resent successfully.",
         });
       } else {
         toast({
@@ -133,6 +139,43 @@ const EventManage = () => {
       });
     } finally {
       setIsResending(false);
+    }
+  };
+
+  const resendSingleInvitation = async (invitationId: string) => {
+    if (!id) return;
+
+    setResendingInvitations(prev => new Set(prev).add(invitationId));
+    try {
+      const response = await fetch(`/api/invitations/${invitationId}/resend`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Invitation Sent",
+          description: "The invitation email has been resent successfully.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to resend invitation. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setResendingInvitations(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(invitationId);
+        return newSet;
+      });
     }
   };
 
@@ -336,10 +379,10 @@ const EventManage = () => {
                       variant="outline"
                       size="sm"
                       onClick={resendInvitations}
-                      disabled={isResending || invitations.length === 0}
+                      disabled={isResending || getPendingInvitationsCount() === 0}
                     >
                       <Send className="h-3 w-3 mr-1" />
-                      {isResending ? 'Sending...' : 'Resend All'}
+                      {isResending ? 'Sending...' : `Resend Pending (${getPendingInvitationsCount()})`}
                     </Button>
                     <Dialog>
                       <DialogTrigger asChild>
@@ -429,14 +472,25 @@ const EventManage = () => {
                             {invitation.rsvpStatus.toUpperCase()}
                           </Badge>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => copyInviteLink(invitation.token)}
-                          className="ml-2"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
+                        <div className="flex gap-1 ml-2">
+                          {invitation.rsvpStatus === 'pending' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => resendSingleInvitation(invitation.id)}
+                              disabled={resendingInvitations.has(invitation.id)}
+                            >
+                              <Send className="h-3 w-3" />
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copyInviteLink(invitation.token)}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>

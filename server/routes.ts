@@ -280,9 +280,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const invitations = await storage.getInvitationsByEventId(req.params.id);
+      const pendingInvitations = invitations.filter(inv => inv.rsvpStatus === 'pending');
       let sentCount = 0;
 
-      for (const invitation of invitations) {
+      for (const invitation of pendingInvitations) {
         if (invitation.email) {
           const inviteUrl = `${req.protocol}://${req.get('host')}/invite/${invitation.token}`;
           const formatDate = (dateString: Date) => {
@@ -315,7 +316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ 
         success: true, 
-        message: `${sentCount} invitations resent successfully` 
+        message: `${sentCount} pending invitations resent successfully` 
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -383,6 +384,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ invitations: newInvitations });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Resend individual invitation
+  app.post("/api/invitations/:id/resend", requireAuth, async (req: any, res) => {
+    try {
+      const invitation = await storage.getInvitationById(req.params.id);
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      const event = await storage.getEventById(invitation.eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (!invitation.email) {
+        return res.status(400).json({ error: "No email address for this invitation" });
+      }
+
+      const inviteUrl = `${req.protocol}://${req.get('host')}/invite/${invitation.token}`;
+      const formatDate = (dateString: Date) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      };
+
+      try {
+        await sendInvitationEmail({
+          to: invitation.email,
+          eventTitle: event.title,
+          eventDescription: event.description || undefined,
+          eventDate: formatDate(event.dateTime),
+          eventLocation: event.location || undefined,
+          inviteUrl,
+          hostEmail: req.user.email
+        });
+
+        res.json({ 
+          success: true, 
+          message: "Invitation resent successfully" 
+        });
+      } catch (error) {
+        console.error(`Failed to resend invitation to ${invitation.email}:`, error);
+        res.status(500).json({ error: "Failed to send email" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
