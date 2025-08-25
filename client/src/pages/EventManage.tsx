@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, Navigate, Link } from 'react-router-dom';
+import { useParams } from 'wouter';
+import { Link } from 'wouter';
 import { Calendar, MapPin, Users, MessageCircle, ArrowLeft, Copy, CheckCircle, Mail, Plus, Send, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -253,7 +254,8 @@ const EventManage = () => {
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    window.location.href = '/auth';
+    return null;
   }
 
   if (!event) {

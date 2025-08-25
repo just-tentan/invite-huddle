@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Link } from 'wouter';
 import { Plus, Calendar, Users, MessageCircle, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,7 +65,8 @@ const Dashboard = () => {
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    window.location.href = '/auth';
+    return null;
   }
 
   const formatDate = (dateString: string) => {

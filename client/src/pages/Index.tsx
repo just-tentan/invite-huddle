@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+// Removed react-router-dom import
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Shield, MessageCircle, Users } from 'lucide-react';
@@ -16,7 +16,8 @@ const Index = () => {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    window.location.href = '/dashboard';
+    return null;
   }
 
   return (
