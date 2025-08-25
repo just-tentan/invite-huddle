@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Shield, MessageCircle, Users } from 'lucide-react';
@@ -15,8 +15,11 @@ const Index = () => {
     );
   }
 
+  const [, navigate] = useLocation();
+
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    navigate("/dashboard");
+    return null;
   }
 
   return (
