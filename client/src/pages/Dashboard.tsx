@@ -14,6 +14,14 @@ interface Event {
   date_time: string;
   location: string | null;
   created_at: string;
+  rsvpCounts: {
+    total: number;
+    yes: number;
+    no: number;
+    maybe: number;
+    pending: number;
+  };
+  messageCount: number;
 }
 
 const Dashboard = () => {
@@ -41,6 +49,8 @@ const Dashboard = () => {
           ...event,
           date_time: event.dateTime,
           created_at: event.createdAt,
+          rsvpCounts: event.rsvpCounts,
+          messageCount: event.messageCount
         }));
         setEvents(formattedEvents);
       } else {
@@ -162,11 +172,11 @@ const Dashboard = () => {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
-                        0 RSVPs
+                        {event.rsvpCounts.total} RSVPs
                       </span>
                       <span className="flex items-center gap-1">
                         <MessageCircle className="h-3 w-3" />
-                        0 messages
+                        {event.messageCount} messages
                       </span>
                     </div>
                     <Link to={`/events/${event.id}/manage`}>

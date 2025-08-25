@@ -24,6 +24,7 @@ interface Invitation {
   id: string;
   token: string;
   email: string | null;
+  name: string | null;
   rsvpStatus: "pending" | "yes" | "no" | "maybe";
 }
 
@@ -36,7 +37,7 @@ const EventManage = () => {
   const [isAddingInvitations, setIsAddingInvitations] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [resendingInvitations, setResendingInvitations] = useState<Set<string>>(new Set());
-  const [newEmails, setNewEmails] = useState(['']);
+  const [newGuests, setNewGuests] = useState([{ email: '', name: '' }]);
 
   useEffect(() => {
     if (user && id) {
@@ -183,8 +184,8 @@ const EventManage = () => {
   const addNewInvitations = async () => {
     if (!id) return;
 
-    const validEmails = newEmails.filter(email => email.trim() && email.includes('@'));
-    if (validEmails.length === 0) {
+    const validGuests = newGuests.filter(guest => guest.email.trim() && guest.email.includes('@'));
+    if (validGuests.length === 0) {
       toast({
         title: "Error",
         description: "Please enter at least one valid email address.",
@@ -201,7 +202,7 @@ const EventManage = () => {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ emails: validEmails }),
+        body: JSON.stringify({ guests: validGuests.map(guest => ({ email: guest.email.trim(), name: guest.name.trim() || null })) }),
       });
 
       if (response.ok) {
@@ -210,7 +211,7 @@ const EventManage = () => {
           title: "Invitations Added",
           description: `${result.invitations.length} new invitations sent successfully.`,
         });
-        setNewEmails(['']);
+        setNewGuests([{ email: '', name: '' }]);
         fetchEventData(); // Refresh the invitations list
       } else {
         toast({
@@ -230,16 +231,16 @@ const EventManage = () => {
     }
   };
 
-  const addEmailField = () => {
-    setNewEmails(prev => [...prev, '']);
+  const addGuestField = () => {
+    setNewGuests(prev => [...prev, { email: '', name: '' }]);
   };
 
-  const removeEmailField = (index: number) => {
-    setNewEmails(prev => prev.filter((_, i) => i !== index));
+  const removeGuestField = (index: number) => {
+    setNewGuests(prev => prev.filter((_, i) => i !== index));
   };
 
-  const updateEmail = (index: number, value: string) => {
-    setNewEmails(prev => prev.map((email, i) => i === index ? value : email));
+  const updateGuest = (index: number, field: 'email' | 'name', value: string) => {
+    setNewGuests(prev => prev.map((guest, i) => i === index ? { ...guest, [field]: value } : guest));
   };
 
   if (loading || loadingEvent) {
@@ -402,37 +403,57 @@ const EventManage = () => {
                         </DialogHeader>
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            <Label>Guest Email Addresses</Label>
-                            {newEmails.map((email, index) => (
-                              <div key={index} className="flex gap-2">
-                                <Input
-                                  placeholder="guest@example.com"
-                                  value={email}
-                                  onChange={(e) => updateEmail(index, e.target.value)}
-                                  type="email"
-                                />
-                                {newEmails.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={() => removeEmailField(index)}
-                                  >
-                                    <Minus className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                {index === newEmails.length - 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={addEmailField}
-                                  >
-                                    <Plus className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            ))}
+                            <Label>Guest Invitations</Label>
+                            <div className="space-y-3">
+                              {newGuests.map((guest, index) => (
+                                <div key={index} className="space-y-2 p-3 border rounded-md">
+                                  <div className="flex gap-2">
+                                    <div className="flex-1">
+                                      <Input
+                                        placeholder="Guest Name (optional)"
+                                        value={guest.name}
+                                        onChange={(e) => updateGuest(index, 'name', e.target.value)}
+                                        data-testid={`input-guest-name-${index}`}
+                                      />
+                                    </div>
+                                    <div className="flex-1">
+                                      <Input
+                                        placeholder="guest@example.com"
+                                        value={guest.email}
+                                        onChange={(e) => updateGuest(index, 'email', e.target.value)}
+                                        type="email"
+                                        data-testid={`input-guest-email-${index}`}
+                                      />
+                                    </div>
+                                    {newGuests.length > 1 && (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => removeGuestField(index)}
+                                        data-testid={`button-remove-guest-${index}`}
+                                      >
+                                        <Minus className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    {index === newGuests.length - 1 && (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={addGuestField}
+                                        data-testid="button-add-guest"
+                                      >
+                                        <Plus className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Add guest names and email addresses to send personalized invitations.
+                            </p>
                           </div>
                         </div>
                         <DialogFooter>
@@ -465,7 +486,7 @@ const EventManage = () => {
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
-                            {invitation.email || 'Anonymous Guest'}
+                            {invitation.name ? `${invitation.name} (${invitation.email})` : invitation.email || 'Anonymous Guest'}
                           </p>
                           <Badge 
                             className={`text-xs mt-1 ${getRSVPBadgeColor(invitation.rsvpStatus)}`}

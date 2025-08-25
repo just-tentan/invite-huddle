@@ -100,7 +100,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const events = await storage.getEventsByHostId(host.id);
-      res.json(events);
+      
+      // Add RSVP and message counts for each event
+      const eventsWithCounts = await Promise.all(events.map(async (event) => {
+        const [invitations, messages] = await Promise.all([
+          storage.getInvitationsByEventId(event.id),
+          storage.getEventMessages(event.id)
+        ]);
+        
+        // Calculate RSVP counts
+        const rsvpCounts = {
+          total: invitations.length,
+          yes: invitations.filter(i => i.rsvpStatus === 'yes').length,
+          no: invitations.filter(i => i.rsvpStatus === 'no').length,
+          maybe: invitations.filter(i => i.rsvpStatus === 'maybe').length,
+          pending: invitations.filter(i => i.rsvpStatus === 'pending').length
+        };
+        
+        return {
+          ...event,
+          rsvpCounts,
+          messageCount: messages.length
+        };
+      }));
+      
+      res.json(eventsWithCounts);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -108,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/events", requireAuth, async (req: any, res) => {
     try {
-      const { title, description, dateTime, location, emails } = req.body;
+      const { title, description, dateTime, location, guests } = req.body;
       const eventData = { title, description, dateTime, location };
       const parsed = insertEventSchema.parse(eventData);
       
@@ -125,12 +149,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parsed.location || null
       );
 
-      // Create invitations if emails are provided
+      // Create invitations if guests are provided
       const invitations = [];
-      if (emails && Array.isArray(emails) && emails.length > 0) {
-        for (const email of emails) {
-          if (email.trim()) {
-            const invitation = await storage.createInvitation(event.id, email.trim());
+      if (guests && Array.isArray(guests) && guests.length > 0) {
+        for (const guest of guests) {
+          if (guest.email && guest.email.trim()) {
+            const invitation = await storage.createInvitation(event.id, guest.email.trim(), undefined, guest.name || undefined);
             invitations.push(invitation);
             
             // Send invitation email
@@ -148,16 +172,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             try {
               await sendInvitationEmail({
-                to: email.trim(),
+                to: guest.email.trim(),
                 eventTitle: parsed.title,
                 eventDescription: parsed.description || undefined,
                 eventDate: formatDate(parsed.dateTime),
                 eventLocation: parsed.location || undefined,
                 inviteUrl,
-                hostEmail: req.user.email
+                hostEmail: req.user.email,
+                guestName: guest.name || undefined,
+                hostName: host.name || undefined
               });
             } catch (error) {
-              console.error(`Failed to send invitation to ${email}:`, error);
+              console.error(`Failed to send invitation to ${guest.email}:`, error);
               // Continue processing other emails even if one fails
             }
           }
@@ -205,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      const invitation = await storage.createInvitation(event.id, email, phone);
+      const invitation = await storage.createInvitation(event.id, email, phone, req.body.name);
       res.json(invitation);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -305,7 +331,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               eventDate: formatDate(event.dateTime),
               eventLocation: event.location || undefined,
               inviteUrl,
-              hostEmail: req.user.email
+              hostEmail: req.user.email,
+              guestName: invitation.name || undefined,
+              hostName: host.name || undefined
             });
             sentCount++;
           } catch (error) {
@@ -326,10 +354,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add new invitations to an event
   app.post("/api/events/:id/add-invitations", requireAuth, async (req: any, res) => {
     try {
-      const { emails } = req.body;
+      const { guests } = req.body;
 
-      if (!emails || !Array.isArray(emails) || emails.length === 0) {
-        return res.status(400).json({ error: "Email addresses are required" });
+      if (!guests || !Array.isArray(guests) || guests.length === 0) {
+        return res.status(400).json({ error: "Guest information is required" });
       }
 
       const event = await storage.getEventById(req.params.id);
@@ -347,9 +375,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingEmails = new Set(existingInvitations.map(inv => inv.email).filter(Boolean));
 
       const newInvitations = [];
-      for (const email of emails) {
-        if (email.trim() && !existingEmails.has(email.trim())) {
-          const invitation = await storage.createInvitation(event.id, email.trim());
+      for (const guest of guests) {
+        if (guest.email && guest.email.trim() && !existingEmails.has(guest.email.trim())) {
+          const invitation = await storage.createInvitation(event.id, guest.email.trim(), undefined, guest.name || undefined);
           newInvitations.push(invitation);
 
           // Send invitation email
@@ -367,16 +395,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           try {
             await sendInvitationEmail({
-              to: email.trim(),
+              to: guest.email.trim(),
               eventTitle: event.title,
               eventDescription: event.description || undefined,
               eventDate: formatDate(event.dateTime),
               eventLocation: event.location || undefined,
               inviteUrl,
-              hostEmail: req.user.email
+              hostEmail: req.user.email,
+              guestName: guest.name || undefined,
+              hostName: host.name || undefined
             });
           } catch (error) {
-            console.error(`Failed to send invitation to ${email}:`, error);
+            console.error(`Failed to send invitation to ${guest.email}:`, error);
           }
         }
       }
@@ -429,7 +459,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eventDate: formatDate(event.dateTime),
           eventLocation: event.location || undefined,
           inviteUrl,
-          hostEmail: req.user.email
+          hostEmail: req.user.email,
+          guestName: invitation.name || undefined,
+          hostName: host.name || undefined
         });
 
         res.json({ 

@@ -21,7 +21,7 @@ export interface IStorage {
   createEvent(hostId: string, title: string, description: string | null, dateTime: Date, location: string | null): Promise<Event>;
   
   // Invitation methods
-  createInvitation(eventId: string, email?: string, phone?: string): Promise<Invitation>;
+  createInvitation(eventId: string, email?: string, phone?: string, name?: string): Promise<Invitation>;
   getInvitationById(id: string): Promise<Invitation | undefined>;
   getInvitationByToken(token: string): Promise<Invitation | undefined>;
   getInvitationsByEventId(eventId: string): Promise<Invitation[]>;
@@ -94,13 +94,14 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async createInvitation(eventId: string, email?: string, phone?: string): Promise<Invitation> {
+  async createInvitation(eventId: string, email?: string, phone?: string, name?: string): Promise<Invitation> {
     const token = crypto.randomBytes(32).toString('base64url');
     const result = await db.insert(invitations).values({
       eventId,
       token,
       email,
       phone,
+      name,
     }).returning();
     return result[0];
   }

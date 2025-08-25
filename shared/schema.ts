@@ -41,6 +41,7 @@ export const invitations = pgTable("invitations", {
   token: text("token").notNull().unique(),
   email: text("email"),
   phone: text("phone"),
+  name: text("name"),
   rsvpStatus: text("rsvp_status", { enum: ["pending", "yes", "no", "maybe"] }).default("pending"),
   isBlocked: boolean("is_blocked").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -75,6 +76,7 @@ export const insertInvitationSchema = createInsertSchema(invitations).pick({
   eventId: true,
   email: true,
   phone: true,
+  name: true,
 });
 
 export const insertEventMessageSchema = createInsertSchema(eventMessages).pick({

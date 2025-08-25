@@ -14,6 +14,8 @@ interface InvitationEmailParams {
   eventLocation?: string;
   inviteUrl: string;
   hostEmail: string;
+  guestName?: string;
+  hostName?: string;
 }
 
 export async function sendInvitationEmail({
@@ -23,7 +25,9 @@ export async function sendInvitationEmail({
   eventDate,
   eventLocation,
   inviteUrl,
-  hostEmail
+  hostEmail,
+  guestName,
+  hostName
 }: InvitationEmailParams): Promise<boolean> {
   try {
     const { data, error } = await resend.emails.send({
@@ -33,6 +37,7 @@ export async function sendInvitationEmail({
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h1 style="color: #2563eb; margin-bottom: 20px;">You're Invited!</h1>
+          ${guestName ? `<p style="color: #374151; margin-bottom: 20px;">Hi ${guestName},</p>` : ''}
           
           <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <h2 style="margin: 0 0 10px 0; color: #1e293b;">${eventTitle}</h2>
@@ -41,12 +46,12 @@ export async function sendInvitationEmail({
             <div style="margin: 15px 0;">
               <p style="margin: 5px 0;"><strong>📅 When:</strong> ${eventDate}</p>
               ${eventLocation ? `<p style="margin: 5px 0;"><strong>📍 Where:</strong> ${eventLocation}</p>` : ''}
-              <p style="margin: 5px 0;"><strong>👤 Host:</strong> ${hostEmail}</p>
+              <p style="margin: 5px 0;"><strong>👤 Host:</strong> ${hostName ? `${hostName} (${hostEmail})` : hostEmail}</p>
             </div>
           </div>
 
           <p style="color: #374151; margin: 20px 0;">
-            You've been personally invited to this private event. Click the button below to view details and RSVP:
+            ${guestName ? `${hostName ? hostName : 'The event host'} has personally invited you to this private event.` : 'You\'ve been personally invited to this private event.'} Click the button below to view details and RSVP:
           </p>
 
           <div style="text-align: center; margin: 30px 0;">

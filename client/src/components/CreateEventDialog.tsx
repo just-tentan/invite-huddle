@@ -27,7 +27,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
     date: '',
     time: '',
     location: '',
-    emails: [''],
+    guests: [{ email: '', name: '' }],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -42,25 +42,25 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
       date: '',
       time: '',
       location: '',
-      emails: [''],
+      guests: [{ email: '', name: '' }],
     });
   };
 
-  const addEmailField = () => {
-    setFormData(prev => ({ ...prev, emails: [...prev.emails, ''] }));
+  const addGuestField = () => {
+    setFormData(prev => ({ ...prev, guests: [...prev.guests, { email: '', name: '' }] }));
   };
 
-  const removeEmailField = (index: number) => {
+  const removeGuestField = (index: number) => {
     setFormData(prev => ({ 
       ...prev, 
-      emails: prev.emails.filter((_, i) => i !== index)
+      guests: prev.guests.filter((_, i) => i !== index)
     }));
   };
 
-  const updateEmail = (index: number, value: string) => {
+  const updateGuest = (index: number, field: 'email' | 'name', value: string) => {
     setFormData(prev => ({
       ...prev,
-      emails: prev.emails.map((email, i) => i === index ? value : email)
+      guests: prev.guests.map((guest, i) => i === index ? { ...guest, [field]: value } : guest)
     }));
   };
 
@@ -93,7 +93,10 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
           description: formData.description || null,
           dateTime: dateTime.toISOString(),
           location: formData.location || null,
-          emails: formData.emails.filter(email => email.trim()),
+          guests: formData.guests.filter(guest => guest.email.trim()).map(guest => ({
+            email: guest.email.trim(),
+            name: guest.name.trim() || null
+          })),
         }),
       });
 
@@ -190,41 +193,56 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
           </div>
 
           <div className="space-y-2">
-            <Label>Guest Email Invitations</Label>
-            <div className="space-y-2">
-              {formData.emails.map((email, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    placeholder="guest@example.com"
-                    value={email}
-                    onChange={(e) => updateEmail(index, e.target.value)}
-                    type="email"
-                  />
-                  {formData.emails.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => removeEmailField(index)}
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {index === formData.emails.length - 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={addEmailField}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  )}
+            <Label>Guest Invitations</Label>
+            <div className="space-y-3">
+              {formData.guests.map((guest, index) => (
+                <div key={index} className="space-y-2 p-3 border rounded-md">
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Guest Name (optional)"
+                        value={guest.name}
+                        onChange={(e) => updateGuest(index, 'name', e.target.value)}
+                        data-testid={`input-guest-name-${index}`}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Input
+                        placeholder="guest@example.com"
+                        value={guest.email}
+                        onChange={(e) => updateGuest(index, 'email', e.target.value)}
+                        type="email"
+                        data-testid={`input-guest-email-${index}`}
+                      />
+                    </div>
+                    {formData.guests.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeGuestField(index)}
+                        data-testid={`button-remove-guest-${index}`}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {index === formData.guests.length - 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={addGuestField}
+                        data-testid="button-add-guest"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
             <p className="text-sm text-muted-foreground">
-              Add email addresses to send invitations. Guests can RSVP without creating an account.
+              Add guest names and email addresses to send personalized invitations. Names are optional but make emails more personal.
             </p>
           </div>
           
