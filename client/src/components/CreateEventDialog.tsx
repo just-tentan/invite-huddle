@@ -27,7 +27,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
     date: '',
     time: '',
     location: '',
-    emails: [''],
+    invitations: [{ email: '', name: '' }],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -42,25 +42,27 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
       date: '',
       time: '',
       location: '',
-      emails: [''],
+      invitations: [{ email: '', name: '' }],
     });
   };
 
-  const addEmailField = () => {
-    setFormData(prev => ({ ...prev, emails: [...prev.emails, ''] }));
+  const addInvitationField = () => {
+    setFormData(prev => ({ ...prev, invitations: [...prev.invitations, { email: '', name: '' }] }));
   };
 
-  const removeEmailField = (index: number) => {
+  const removeInvitationField = (index: number) => {
     setFormData(prev => ({ 
       ...prev, 
-      emails: prev.emails.filter((_, i) => i !== index)
+      invitations: prev.invitations.filter((_, i) => i !== index)
     }));
   };
 
-  const updateEmail = (index: number, value: string) => {
+  const updateInvitation = (index: number, field: 'email' | 'name', value: string) => {
     setFormData(prev => ({
       ...prev,
-      emails: prev.emails.map((email, i) => i === index ? value : email)
+      invitations: prev.invitations.map((invitation, i) => 
+        i === index ? { ...invitation, [field]: value } : invitation
+      )
     }));
   };
 
@@ -93,7 +95,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
           description: formData.description || null,
           dateTime: dateTime.toISOString(),
           location: formData.location || null,
-          emails: formData.emails.filter(email => email.trim()),
+          invitations: formData.invitations.filter(inv => inv.email.trim()),
         }),
       });
 
@@ -190,41 +192,50 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
           </div>
 
           <div className="space-y-2">
-            <Label>Guest Email Invitations</Label>
-            <div className="space-y-2">
-              {formData.emails.map((email, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    placeholder="guest@example.com"
-                    value={email}
-                    onChange={(e) => updateEmail(index, e.target.value)}
-                    type="email"
-                  />
-                  {formData.emails.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => removeEmailField(index)}
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {index === formData.emails.length - 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={addEmailField}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  )}
+            <Label>Guest Invitations</Label>
+            <div className="space-y-3">
+              {formData.invitations.map((invitation, index) => (
+                <div key={index} className="border rounded-lg p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Guest Name (optional)"
+                      value={invitation.name}
+                      onChange={(e) => updateInvitation(index, 'name', e.target.value)}
+                    />
+                    {formData.invitations.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeInvitationField(index)}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="guest@example.com"
+                      value={invitation.email}
+                      onChange={(e) => updateInvitation(index, 'email', e.target.value)}
+                      type="email"
+                    />
+                    {index === formData.invitations.length - 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={addInvitationField}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
             <p className="text-sm text-muted-foreground">
-              Add email addresses to send invitations. Guests can RSVP without creating an account.
+              Add guest names and email addresses to send invitations. Names are optional but make the experience more personal.
             </p>
           </div>
           

@@ -127,6 +127,7 @@ export type Database = {
           event_id: string
           id: string
           is_blocked: boolean | null
+          name: string | null
           phone: string | null
           rsvp_status: string | null
           token: string
@@ -138,6 +139,7 @@ export type Database = {
           event_id: string
           id?: string
           is_blocked?: boolean | null
+          name?: string | null
           phone?: string | null
           rsvp_status?: string | null
           token: string
@@ -149,6 +151,7 @@ export type Database = {
           event_id?: string
           id?: string
           is_blocked?: boolean | null
+          name?: string | null
           phone?: string | null
           rsvp_status?: string | null
           token?: string

@@ -108,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/events", requireAuth, async (req: any, res) => {
     try {
-      const { title, description, dateTime, location, emails } = req.body;
+      const { title, description, dateTime, location, invitations } = req.body;
       const eventData = { title, description, dateTime, location };
       const parsed = insertEventSchema.parse(eventData);
       
@@ -125,16 +125,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parsed.location || null
       );
 
-      // Create invitations if emails are provided
-      const invitations = [];
-      if (emails && Array.isArray(emails) && emails.length > 0) {
-        for (const email of emails) {
-          if (email.trim()) {
-            const invitation = await storage.createInvitation(event.id, email.trim());
-            invitations.push(invitation);
+      // Create invitations if provided
+      const createdInvitations = [];
+      if (invitations && Array.isArray(invitations) && invitations.length > 0) {
+        for (const invitation of invitations) {
+          if (invitation.email.trim()) {
+            const newInvitation = await storage.createInvitation(event.id, invitation.email.trim());
+            createdInvitations.push(newInvitation);
             
             // Send invitation email
-            const inviteUrl = `${req.protocol}://${req.get('host')}/invite/${invitation.token}`;
+            const inviteUrl = `${req.protocol}://${req.get('host')}/invite/${newInvitation.token}`;
             const formatDate = (dateString: Date) => {
               return new Date(dateString).toLocaleDateString('en-US', {
                 weekday: 'long',
@@ -148,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             try {
               await sendInvitationEmail({
-                to: email.trim(),
+                to: invitation.email.trim(),
                 eventTitle: parsed.title,
                 eventDescription: parsed.description || undefined,
                 eventDate: formatDate(parsed.dateTime),
@@ -157,14 +157,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 hostEmail: req.user.email
               });
             } catch (error) {
-              console.error(`Failed to send invitation to ${email}:`, error);
+              console.error(`Failed to send invitation to ${invitation.email}:`, error);
               // Continue processing other emails even if one fails
             }
           }
         }
       }
       
-      res.json({ event, invitations });
+      res.json({ event, invitations: createdInvitations });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }

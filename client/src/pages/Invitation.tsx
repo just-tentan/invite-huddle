@@ -19,6 +19,7 @@ interface InvitationData {
   id: string;
   token: string;
   email: string | null;
+  name: string | null;
   rsvpStatus: "pending" | "yes" | "no" | "maybe";
   eventId: string;
 }

@@ -23,6 +23,7 @@ interface Invitation {
   id: string;
   token: string;
   email: string | null;
+  name: string | null;
   rsvpStatus: "pending" | "yes" | "no" | "maybe";
 }
 
@@ -463,7 +464,7 @@ const EventManage = () => {
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
-                            {invitation.email || 'Anonymous Guest'}
+                            {invitation.name || invitation.email || 'Anonymous Guest'}
                           </p>
                           <Badge 
                             className={`text-xs mt-1 ${getRSVPBadgeColor(invitation.rsvpStatus)}`}
