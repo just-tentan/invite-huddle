@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation, Link } from 'wouter';
+import { useParams, Navigate, Link } from 'react-router-dom';
 import { Calendar, MapPin, Users, MessageCircle, ArrowLeft, Copy, CheckCircle, Mail, Plus, Send, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +23,6 @@ interface Invitation {
   id: string;
   token: string;
   email: string | null;
-  name: string | null;
   rsvpStatus: "pending" | "yes" | "no" | "maybe";
 }
 
@@ -253,11 +252,8 @@ const EventManage = () => {
     );
   }
 
-  const [, navigate] = useLocation();
-
   if (!user) {
-    navigate("/auth");
-    return null;
+    return <Navigate to="/auth" replace />;
   }
 
   if (!event) {
@@ -467,7 +463,7 @@ const EventManage = () => {
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
-                            {invitation.name || invitation.email || 'Anonymous Guest'}
+                            {invitation.email || 'Anonymous Guest'}
                           </p>
                           <Badge 
                             className={`text-xs mt-1 ${getRSVPBadgeColor(invitation.rsvpStatus)}`}

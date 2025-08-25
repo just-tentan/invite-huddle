@@ -2,12 +2,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-import { componentTagger } from "lovable-tagger";
 
-export default defineConfig(async ({ mode }) => ({
+export default defineConfig({
   plugins: [
     react(),
-    mode === 'development' && componentTagger(),
     runtimeErrorOverlay(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
@@ -17,7 +15,7 @@ export default defineConfig(async ({ mode }) => ({
           ),
         ]
       : []),
-  ].filter(Boolean),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -26,12 +24,8 @@ export default defineConfig(async ({ mode }) => ({
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
-  server: {
-    host: "::",
-    port: 8080,
-  },
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
   },
-}));
+});

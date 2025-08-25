@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { users, hosts, events, invitations, eventMessages, type User, type InsertUser, type Host, type Event, type Invitation, type EventMessage } from "@shared/schema";
 import bcrypt from "bcryptjs";
@@ -75,31 +75,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEventsByHostId(hostId: string): Promise<Event[]> {
-    const eventsData = await db.select().from(events).where(eq(events.hostId, hostId)).orderBy(events.dateTime);
-    
-    // Add RSVP counts and message counts for each event
-    const eventsWithCounts = await Promise.all(
-      eventsData.map(async (event) => {
-        const [rsvpCounts, messageCount] = await Promise.all([
-          db.select({
-            yes: sql<number>`COUNT(*) FILTER (WHERE rsvp_status = 'yes')`,
-            no: sql<number>`COUNT(*) FILTER (WHERE rsvp_status = 'no')`,
-            maybe: sql<number>`COUNT(*) FILTER (WHERE rsvp_status = 'maybe')`,
-            pending: sql<number>`COUNT(*) FILTER (WHERE rsvp_status = 'pending')`,
-            total: sql<number>`COUNT(*)`
-          }).from(invitations).where(eq(invitations.eventId, event.id)),
-          db.select({ count: sql<number>`COUNT(*)` }).from(eventMessages).where(eq(eventMessages.eventId, event.id))
-        ]);
-        
-        return {
-          ...event,
-          rsvpCounts: rsvpCounts[0] || { yes: 0, no: 0, maybe: 0, pending: 0, total: 0 },
-          messageCount: messageCount[0]?.count || 0
-        };
-      })
-    );
-    
-    return eventsWithCounts;
+    return db.select().from(events).where(eq(events.hostId, hostId)).orderBy(events.dateTime);
   }
 
   async getEventById(id: string): Promise<Event | undefined> {

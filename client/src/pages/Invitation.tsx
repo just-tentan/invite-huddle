@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'wouter';
+import { useParams } from 'react-router-dom';
 import { Calendar, MapPin, Clock, Users, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,6 @@ interface InvitationData {
   id: string;
   token: string;
   email: string | null;
-  name: string | null;
   rsvpStatus: "pending" | "yes" | "no" | "maybe";
   eventId: string;
 }

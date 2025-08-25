@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation, Link } from 'wouter';
+import { Navigate, Link } from 'react-router-dom';
 import { Plus, Calendar, Users, MessageCircle, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,14 +14,6 @@ interface Event {
   date_time: string;
   location: string | null;
   created_at: string;
-  rsvpCounts?: {
-    yes: number;
-    no: number;
-    maybe: number;
-    pending: number;
-    total: number;
-  };
-  messageCount?: number;
 }
 
 const Dashboard = () => {
@@ -72,11 +64,8 @@ const Dashboard = () => {
     );
   }
 
-  const [, navigate] = useLocation();
-
   if (!user) {
-    navigate("/auth");
-    return null;
+    return <Navigate to="/auth" replace />;
   }
 
   const formatDate = (dateString: string) => {
@@ -172,11 +161,11 @@ const Dashboard = () => {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
-                        {event.rsvpCounts?.total || 0} RSVPs
+                        0 RSVPs
                       </span>
                       <span className="flex items-center gap-1">
                         <MessageCircle className="h-3 w-3" />
-                        {event.messageCount || 0} messages
+                        0 messages
                       </span>
                     </div>
                     <Link to={`/events/${event.id}/manage`}>

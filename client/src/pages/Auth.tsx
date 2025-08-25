@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,11 +24,8 @@ const Auth = () => {
     );
   }
 
-  const [, navigate] = useLocation();
-
   if (user) {
-    navigate("/dashboard");
-    return null;
+    return <Navigate to="/dashboard" replace />;
   }
 
   const handleSignIn = async (e: React.FormEvent) => {
