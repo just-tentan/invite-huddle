@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'wouter';
-import { Calendar, MapPin, Clock, Users, CheckCircle } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, CheckCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { EventChat } from '../components/EventChat';
 
 interface Event {
@@ -30,10 +31,34 @@ const Invitation = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [confirmationMessage, setConfirmationMessage] = useState('');
 
   useEffect(() => {
     if (token) {
       fetchInvitation();
+      
+      // Check for RSVP confirmation from URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const rsvpResponse = urlParams.get('rsvp');
+      const confirmed = urlParams.get('confirmed');
+      
+      if (confirmed === 'true' && rsvpResponse) {
+        const responseTexts = {
+          'yes': 'Great! Your RSVP has been confirmed. You\'re attending this event.',
+          'maybe': 'Thanks! Your RSVP has been updated to Maybe. Let the host know if your plans change.',
+          'no': 'Your RSVP has been updated. Sorry you can\'t make it this time.'
+        };
+        
+        setConfirmationMessage(responseTexts[rsvpResponse as keyof typeof responseTexts] || 'Your RSVP has been updated.');
+        setShowConfirmation(true);
+        
+        // Clear the URL parameters
+        window.history.replaceState({}, '', window.location.pathname);
+        
+        // Hide confirmation after 5 seconds
+        setTimeout(() => setShowConfirmation(false), 5000);
+      }
     }
   }, [token]);
 
@@ -168,6 +193,24 @@ const Invitation = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
+        {/* RSVP Confirmation Banner */}
+        {showConfirmation && (
+          <Alert className="mb-6 border-green-200 bg-green-50 text-green-800">
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>{confirmationMessage}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowConfirmation(false)}
+                className="h-auto p-1 text-green-600 hover:text-green-800"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Event Details */}
         <Card className="mb-6">
           <CardHeader>

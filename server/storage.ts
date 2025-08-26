@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { users, hosts, events, invitations, eventMessages, type User, type InsertUser, type Host, type Event, type Invitation, type EventMessage } from "@shared/schema";
+import { users, hosts, events, invitations, eventMessages, type User, type InsertUser, type Host, type Event, type Invitation, type EventMessage, type UpdateHostProfile } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -14,6 +14,7 @@ export interface IStorage {
   // Host methods
   getHostByUserId(userId: string): Promise<Host | undefined>;
   createHost(userId: string, email: string, name?: string): Promise<Host>;
+  updateHostProfile(userId: string, profile: UpdateHostProfile): Promise<Host>;
   
   // Event methods
   getEventsByHostId(hostId: string): Promise<Event[]>;
@@ -71,6 +72,17 @@ export class DatabaseStorage implements IStorage {
       email,
       name,
     }).returning();
+    return result[0];
+  }
+
+  async updateHostProfile(userId: string, profile: UpdateHostProfile): Promise<Host> {
+    const result = await db.update(hosts)
+      .set({
+        ...profile,
+        updatedAt: new Date(),
+      })
+      .where(eq(hosts.userId, userId))
+      .returning();
     return result[0];
   }
 

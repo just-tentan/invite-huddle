@@ -2,8 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
-import { insertUserSchema, insertEventSchema } from "@shared/schema";
+import { insertUserSchema, insertEventSchema, updateHostProfileSchema } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
+import { ObjectStorageService } from "./objectStorage";
 
 // Session middleware setup
 declare module "express-session" {
@@ -180,7 +181,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 inviteUrl,
                 hostEmail: req.user.email,
                 guestName: guest.name || undefined,
-                hostName: host.name || undefined
+                hostName: host.name || undefined,
+                token: invitation.token,
+                baseUrl: `${req.protocol}://${req.get('host')}`
               });
             } catch (error) {
               console.error(`Failed to send invitation to ${guest.email}:`, error);
@@ -333,7 +336,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               inviteUrl,
               hostEmail: req.user.email,
               guestName: invitation.name || undefined,
-              hostName: host.name || undefined
+              hostName: host.name || undefined,
+              token: invitation.token,
+              baseUrl: `${req.protocol}://${req.get('host')}`
             });
             sentCount++;
           } catch (error) {
@@ -403,7 +408,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               inviteUrl,
               hostEmail: req.user.email,
               guestName: guest.name || undefined,
-              hostName: host.name || undefined
+              hostName: host.name || undefined,
+              token: invitation.token,
+              baseUrl: `${req.protocol}://${req.get('host')}`
             });
           } catch (error) {
             console.error(`Failed to send invitation to ${guest.email}:`, error);
@@ -571,6 +578,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(newMessage);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Host profile routes
+  app.get("/api/host/profile", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+      res.json(host);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/host/profile", requireAuth, async (req: any, res) => {
+    try {
+      const profileData = updateHostProfileSchema.parse(req.body);
+      const updatedHost = await storage.updateHostProfile(req.user.id, profileData);
+      res.json(updatedHost);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Object storage routes for profile pictures
+  app.post("/api/objects/upload", requireAuth, async (req: any, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/host-pictures", requireAuth, async (req: any, res) => {
+    try {
+      if (!req.body.pictureUrl) {
+        return res.status(400).json({ error: "pictureUrl is required" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        req.body.pictureUrl,
+        {
+          owner: req.user.id,
+          visibility: "public", // Profile pictures are public
+        },
+      );
+
+      res.status(200).json({
+        objectPath: objectPath,
+      });
+    } catch (error: any) {
+      console.error("Error setting picture:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Serve private objects (for profile pictures)
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error: any) {
+      console.error("Error serving object:", error);
+      if (error.name === "ObjectNotFoundError") {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  // RSVP routes for direct email responses
+  app.get("/api/rsvp/:token/:response", async (req: any, res) => {
+    try {
+      const { token, response } = req.params;
+      
+      if (!['yes', 'no', 'maybe'].includes(response)) {
+        return res.status(400).json({ error: "Invalid RSVP response" });
+      }
+
+      const invitation = await storage.getInvitationByToken(token);
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      await storage.updateInvitationRSVP(token, response);
+      
+      // Redirect to event page with confirmation
+      const event = await storage.getEventById(invitation.eventId);
+      if (event) {
+        res.redirect(`/invite/${token}?rsvp=${response}&confirmed=true`);
+      } else {
+        res.status(404).json({ error: "Event not found" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
-import { Plus, Calendar, Users, MessageCircle, LogOut } from 'lucide-react';
+import { Plus, Calendar, Users, MessageCircle, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { CreateEventDialog } from '@/components/CreateEventDialog';
+import { HostProfileDialog } from '@/components/HostProfileDialog';
+import type { Host } from '@shared/schema';
 
 interface Event {
   id: string;
@@ -29,12 +31,29 @@ const Dashboard = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [host, setHost] = useState<Host | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchEvents();
+      fetchHostProfile();
     }
   }, [user]);
+
+  const fetchHostProfile = async () => {
+    try {
+      const response = await fetch('/api/host/profile', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const hostData = await response.json();
+        setHost(hostData);
+      }
+    } catch (error) {
+      console.error('Error fetching host profile:', error);
+    }
+  };
 
   const fetchEvents = async () => {
     try {
@@ -94,11 +113,35 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <div className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold">EventHost</h1>
-            <p className="text-muted-foreground">Welcome back, {user.email}</p>
+          <div className="flex items-center gap-3">
+            {host?.pictureUrl && (
+              <img
+                src={host.pictureUrl}
+                alt="Profile"
+                className="w-10 h-10 rounded-full object-cover border-2 border-border"
+              />
+            )}
+            <div>
+              <h1 className="text-2xl font-bold">EventHost</h1>
+              <p className="text-muted-foreground">
+                Welcome back, {host?.preferredName || host?.firstName || user.email}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
+            {host && (
+              <HostProfileDialog
+                host={host}
+                onHostUpdate={(updatedHost) => {
+                  setHost(updatedHost);
+                }}
+              >
+                <Button variant="outline" data-testid="button-edit-profile">
+                  <User className="h-4 w-4 mr-2" />
+                  Edit Profile
+                </Button>
+              </HostProfileDialog>
+            )}
             <Button
               onClick={() => setIsCreateDialogOpen(true)}
               className="flex items-center gap-2"
@@ -172,7 +215,7 @@ const Dashboard = () => {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
-                        {event.rsvpCounts.total} RSVPs
+                        {event.rsvpCounts.yes}/{event.rsvpCounts.total} attending
                       </span>
                       <span className="flex items-center gap-1">
                         <MessageCircle className="h-3 w-3" />

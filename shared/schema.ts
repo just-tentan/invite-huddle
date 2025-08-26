@@ -17,6 +17,16 @@ export const hosts = pgTable("hosts", {
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   email: text("email").notNull().unique(),
   name: text("name"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  preferredName: text("preferred_name"),
+  contact: text("contact"),
+  pictureUrl: text("picture_url"),
+  facebookUrl: text("facebook_url"),
+  instagramUrl: text("instagram_url"),
+  twitterUrl: text("twitter_url"),
+  linkedinUrl: text("linkedin_url"),
+  websiteUrl: text("website_url"),
   verified: boolean("verified").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -86,7 +96,21 @@ export const insertEventMessageSchema = createInsertSchema(eventMessages).pick({
   message: true,
 });
 
+export const updateHostProfileSchema = createInsertSchema(hosts).pick({
+  firstName: true,
+  lastName: true,
+  preferredName: true,
+  contact: true,
+  pictureUrl: true,
+  facebookUrl: true,
+  instagramUrl: true,
+  twitterUrl: true,
+  linkedinUrl: true,
+  websiteUrl: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpdateHostProfile = z.infer<typeof updateHostProfileSchema>;
 export type User = typeof users.$inferSelect;
 export type Host = typeof hosts.$inferSelect;
 export type Event = typeof events.$inferSelect;

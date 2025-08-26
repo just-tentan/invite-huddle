@@ -16,6 +16,8 @@ interface InvitationEmailParams {
   hostEmail: string;
   guestName?: string;
   hostName?: string;
+  token: string;
+  baseUrl: string;
 }
 
 export async function sendInvitationEmail({
@@ -27,7 +29,9 @@ export async function sendInvitationEmail({
   inviteUrl,
   hostEmail,
   guestName,
-  hostName
+  hostName,
+  token,
+  baseUrl
 }: InvitationEmailParams): Promise<boolean> {
   try {
     const { data, error } = await resend.emails.send({
@@ -54,10 +58,39 @@ export async function sendInvitationEmail({
             ${guestName ? `${hostName ? hostName : 'The event host'} has personally invited you to this private event.` : 'You\'ve been personally invited to this private event.'} Click the button below to view details and RSVP:
           </p>
 
+          <p style="color: #374151; margin: 20px 0; text-align: center; font-weight: bold;">
+            Please respond to this invitation:
+          </p>
+
           <div style="text-align: center; margin: 30px 0;">
+            <table style="margin: 0 auto; border-spacing: 10px;">
+              <tr>
+                <td>
+                  <a href="${baseUrl}/api/rsvp/${token}/yes" 
+                     style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; min-width: 80px; text-align: center;">
+                    ✓ Yes
+                  </a>
+                </td>
+                <td>
+                  <a href="${baseUrl}/api/rsvp/${token}/maybe" 
+                     style="background-color: #ca8a04; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; min-width: 80px; text-align: center;">
+                    ? Maybe
+                  </a>
+                </td>
+                <td>
+                  <a href="${baseUrl}/api/rsvp/${token}/no" 
+                     style="background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; min-width: 80px; text-align: center;">
+                    ✗ No
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0;">
             <a href="${inviteUrl}" 
-               style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
-              View Invitation & RSVP
+               style="background-color: #2563eb; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; font-size: 14px;">
+              View Full Event Details
             </a>
           </div>
 
