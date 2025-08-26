@@ -43,6 +43,14 @@ export const eventGroups = pgTable("event_groups", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Event groups guest lists relationship table
+export const eventGroupGuestLists = pgTable("event_group_guest_lists", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventGroupId: uuid("event_group_id").notNull().references(() => eventGroups.id, { onDelete: "cascade" }),
+  guestListId: uuid("guest_list_id").notNull().references(() => guestLists.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Guest lists table
 export const guestLists = pgTable("guest_lists", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -69,9 +77,12 @@ export const events = pgTable("events", {
   hostId: uuid("host_id").notNull().references(() => hosts.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),
-  dateTime: timestamp("date_time").notNull(),
+  startDateTime: timestamp("start_date_time").notNull(),
+  endDateTime: timestamp("end_date_time"),
+  isAllDay: boolean("is_all_day").default(false),
   location: text("location"),
   exactAddress: text("exact_address"),
+  customDirections: text("custom_directions"),
   status: text("status", { enum: ["upcoming", "cancelled", "past"] }).default("upcoming"),
   groupId: uuid("group_id").references(() => eventGroups.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -115,9 +126,12 @@ export const insertEventSchema = createInsertSchema(events).pick({
   description: true,
   location: true,
   exactAddress: true,
+  customDirections: true,
+  isAllDay: true,
   groupId: true,
 }).extend({
-  dateTime: z.string().transform((str) => new Date(str)),
+  startDateTime: z.string().transform((str) => new Date(str)),
+  endDateTime: z.string().optional().transform((str) => str ? new Date(str) : undefined),
 });
 
 export const updateEventSchema = createInsertSchema(events).pick({
@@ -125,7 +139,10 @@ export const updateEventSchema = createInsertSchema(events).pick({
   description: true,
   location: true,
   exactAddress: true,
-  dateTime: true,
+  customDirections: true,
+  startDateTime: true,
+  endDateTime: true,
+  isAllDay: true,
   status: true,
   groupId: true,
 });
@@ -133,6 +150,11 @@ export const updateEventSchema = createInsertSchema(events).pick({
 export const insertEventGroupSchema = createInsertSchema(eventGroups).pick({
   title: true,
   description: true,
+});
+
+export const insertEventGroupGuestListSchema = createInsertSchema(eventGroupGuestLists).pick({
+  eventGroupId: true,
+  guestListId: true,
 });
 
 export const insertGuestListSchema = createInsertSchema(guestLists).pick({
@@ -179,6 +201,7 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type UpdateEvent = z.infer<typeof updateEventSchema>;
 export type InsertEventGroup = z.infer<typeof insertEventGroupSchema>;
+export type InsertEventGroupGuestList = z.infer<typeof insertEventGroupGuestListSchema>;
 export type InsertGuestList = z.infer<typeof insertGuestListSchema>;
 export type InsertGuestListMember = z.infer<typeof insertGuestListMemberSchema>;
 export type UpdateHostProfile = z.infer<typeof updateHostProfileSchema>;
@@ -187,6 +210,7 @@ export type User = typeof users.$inferSelect;
 export type Host = typeof hosts.$inferSelect;
 export type Event = typeof events.$inferSelect;
 export type EventGroup = typeof eventGroups.$inferSelect;
+export type EventGroupGuestList = typeof eventGroupGuestLists.$inferSelect;
 export type GuestList = typeof guestLists.$inferSelect;
 export type GuestListMember = typeof guestListMembers.$inferSelect;
 export type Invitation = typeof invitations.$inferSelect;

@@ -54,6 +54,8 @@ const EventManage = () => {
   });
   const [isCancelling, setIsCancelling] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user && id) {
@@ -358,6 +360,40 @@ const EventManage = () => {
     }
   };
 
+  const handleDeleteEvent = async () => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/events/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        setIsDeleteDialogOpen(false);
+        toast({
+          title: "Event Deleted",
+          description: "The event has been permanently deleted.",
+        });
+        // Redirect to dashboard after successful deletion
+        window.location.href = '/dashboard';
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete event. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleRemoveGuest = async (invitationId: string, guestName: string) => {
     try {
       const response = await fetch(`/api/events/${id}/guests/${invitationId}`, {
@@ -534,15 +570,30 @@ const EventManage = () => {
                       <Edit className="h-3 w-3 mr-1" />
                       Edit
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsCancelDialogOpen(true)}
-                      data-testid="button-cancel-event"
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Cancel
-                    </Button>
+                    
+                    {/* Actions Dropdown */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" data-testid="button-event-actions">
+                          <MoreVertical className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setIsCancelDialogOpen(true)} data-testid="menu-cancel-event">
+                          <Ban className="h-4 w-4 mr-2" />
+                          Cancel Event
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => setIsDeleteDialogOpen(true)} 
+                          className="text-destructive focus:text-destructive"
+                          data-testid="menu-delete-event"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Event
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </CardHeader>
@@ -919,6 +970,45 @@ const EventManage = () => {
               data-testid="button-confirm-cancel"
             >
               {isCancelling ? 'Cancelling...' : 'Cancel Event'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Event Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Event Permanently</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete this event? This action cannot be undone and all data will be lost.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+              <div className="flex items-center gap-2 text-destructive">
+                <Trash2 className="h-4 w-4" />
+                <span className="font-semibold">This will permanently:</span>
+              </div>
+              <ul className="mt-2 text-sm text-destructive/80 space-y-1 ml-6">
+                <li>• Delete the event and all its data</li>
+                <li>• Remove all invitations and RSVPs</li>
+                <li>• Delete all chat messages</li>
+                <li>• This action cannot be undone</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Keep Event
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteEvent} 
+              disabled={isDeleting}
+              data-testid="button-confirm-delete"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Permanently'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
-import { insertUserSchema, insertEventSchema, updateHostProfileSchema, insertEventGroupSchema, insertGuestListSchema, insertGuestListMemberSchema } from "@shared/schema";
+import { insertUserSchema, insertEventSchema, updateHostProfileSchema, insertEventGroupSchema, insertGuestListSchema, insertGuestListMemberSchema, insertEventGroupGuestListSchema } from "@shared/schema";
 import { sendInvitationEmail, sendCancellationEmail } from "./email";
 import { ObjectStorageService } from "./objectStorage";
 
@@ -145,8 +145,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/events", requireAuth, async (req: any, res) => {
     try {
-      const { title, description, dateTime, location, guests } = req.body;
-      const eventData = { title, description, dateTime, location };
+      const { title, description, startDateTime, endDateTime, location, exactAddress, customDirections, isAllDay, groupId, guests } = req.body;
+      const eventData = { title, description, startDateTime, endDateTime, location, exactAddress, customDirections, isAllDay, groupId };
       const parsed = insertEventSchema.parse(eventData);
       
       const host = await storage.getHostByUserId(req.user.id);
@@ -158,8 +158,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         host.id,
         parsed.title,
         parsed.description || null,
-        parsed.dateTime,
-        parsed.location || null
+        parsed.startDateTime,
+        parsed.endDateTime || null,
+        parsed.location || null,
+        parsed.exactAddress || null,
+        parsed.customDirections || null,
+        parsed.isAllDay || false,
+        parsed.groupId || null
       );
 
       // Create invitations if guests are provided
@@ -189,7 +194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 to: guest.email.trim(),
                 eventTitle: parsed.title,
                 eventDescription: parsed.description || undefined,
-                eventDate: formatDate(parsed.dateTime),
+                eventDate: formatDate(parsed.startDateTime),
                 eventLocation: parsed.location || undefined,
                 inviteUrl,
                 hostEmail: req.user.email,
@@ -248,10 +253,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = {
         title: req.body.title,
         description: req.body.description,
-        dateTime: new Date(req.body.dateTime),
+        startDateTime: new Date(req.body.startDateTime),
+        endDateTime: req.body.endDateTime ? new Date(req.body.endDateTime) : null,
+        isAllDay: req.body.isAllDay || false,
         location: req.body.location,
-        exactAddress: req.body.exactAddress,
-        groupId: req.body.groupId,
+        exactAddress: req.body.exactAddress || null,
+        customDirections: req.body.customDirections || null,
+        groupId: req.body.groupId || null,
       };
 
       const updatedEvent = await storage.updateEvent(req.params.id, updateData);
@@ -289,7 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await sendCancellationEmail({
               to: invitation.email,
               eventTitle: event.title,
-              eventDate: formatDate(event.dateTime),
+              eventDate: formatDate(event.startDateTime),
               eventLocation: event.location || undefined,
               hostName: host.preferredName || host.firstName || host.name || host.email,
               guestName: invitation.name || undefined
@@ -305,6 +313,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: `Event cancelled. ${acceptedInvitations.length} cancellation emails sent.`,
         event: cancelledEvent
       });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete event
+  app.delete("/api/events/:id", requireAuth, async (req: any, res) => {
+    try {
+      const event = await storage.getEventById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      // Check if user owns this event
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deleteEvent(req.params.id);
+      res.json({ success: true, message: "Event deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -514,7 +543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               to: invitation.email,
               eventTitle: event.title,
               eventDescription: event.description || undefined,
-              eventDate: formatDate(event.dateTime),
+              eventDate: formatDate(event.startDateTime),
               eventLocation: event.location || undefined,
               inviteUrl,
               hostEmail: req.user.email,
@@ -586,7 +615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               to: guest.email.trim(),
               eventTitle: event.title,
               eventDescription: event.description || undefined,
-              eventDate: formatDate(event.dateTime),
+              eventDate: formatDate(event.startDateTime),
               eventLocation: event.location || undefined,
               inviteUrl,
               hostEmail: req.user.email,
@@ -647,7 +676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           to: invitation.email,
           eventTitle: event.title,
           eventDescription: event.description || undefined,
-          eventDate: formatDate(event.dateTime),
+          eventDate: formatDate(event.startDateTime),
           eventLocation: event.location || undefined,
           inviteUrl,
           hostEmail: req.user.email,
@@ -907,6 +936,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Event Group Guest List routes
+  app.get("/api/event-groups/:id/guest-lists", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const eventGroup = await storage.getEventGroupById(req.params.id);
+      if (!eventGroup || eventGroup.hostId !== host.id) {
+        return res.status(404).json({ error: "Event group not found" });
+      }
+
+      const associations = await storage.getEventGroupGuestLists(req.params.id);
+      res.json(associations);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/event-groups/:id/guest-lists", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const eventGroup = await storage.getEventGroupById(req.params.id);
+      if (!eventGroup || eventGroup.hostId !== host.id) {
+        return res.status(404).json({ error: "Event group not found" });
+      }
+
+      // Check if guest list exists and belongs to this host
+      const guestList = await storage.getGuestListById(req.body.guestListId);
+      if (!guestList || guestList.hostId !== host.id) {
+        return res.status(404).json({ error: "Guest list not found" });
+      }
+
+      const association = await storage.addGuestListToEventGroup(req.params.id, req.body.guestListId);
+      res.status(201).json(association);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/event-groups/:id/guest-lists/:guestListId", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const eventGroup = await storage.getEventGroupById(req.params.id);
+      if (!eventGroup || eventGroup.hostId !== host.id) {
+        return res.status(404).json({ error: "Event group not found" });
+      }
+
+      await storage.removeGuestListFromEventGroup(req.params.id, req.params.guestListId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Guest List routes
   app.get("/api/guest-lists", requireAuth, async (req: any, res) => {
     try {
@@ -1111,7 +1204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             to: member.email,
             eventTitle: event.title,
             eventDescription: event.description || undefined,
-            eventDate: formatDate(event.dateTime),
+            eventDate: formatDate(event.startDateTime),
             eventLocation: event.location || undefined,
             inviteUrl: `${process.env.APP_URL || 'http://localhost:5000'}/invite/${invitation.token}`,
             hostEmail: host.email,

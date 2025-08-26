@@ -1,10 +1,10 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "./db";
 import { 
-  users, hosts, events, invitations, eventMessages, eventGroups, guestLists, guestListMembers,
+  users, hosts, events, invitations, eventMessages, eventGroups, guestLists, guestListMembers, eventGroupGuestLists,
   type User, type InsertUser, type Host, type Event, type Invitation, type EventMessage, 
   type EventGroup, type GuestList, type GuestListMember, type UpdateHostProfile, 
-  type InsertEventGroup, type InsertGuestList, type InsertGuestListMember
+  type InsertEventGroup, type InsertGuestList, type InsertGuestListMember, type EventGroupGuestList, type InsertEventGroupGuestList
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -24,8 +24,9 @@ export interface IStorage {
   // Event methods
   getEventsByHostId(hostId: string): Promise<Event[]>;
   getEventById(id: string): Promise<Event | undefined>;
-  createEvent(hostId: string, title: string, description: string | null, dateTime: Date, location: string | null): Promise<Event>;
+  createEvent(hostId: string, title: string, description: string | null, startDateTime: Date, endDateTime: Date | null, location: string | null, exactAddress: string | null, customDirections: string | null, isAllDay: boolean, groupId: string | null): Promise<Event>;
   updateEvent(id: string, updates: Partial<Event>): Promise<Event>;
+  deleteEvent(id: string): Promise<void>;
   
   // Invitation methods
   createInvitation(eventId: string, email?: string, phone?: string, name?: string): Promise<Invitation>;
@@ -46,6 +47,11 @@ export interface IStorage {
   createEventGroup(hostId: string, data: InsertEventGroup): Promise<EventGroup>;
   updateEventGroup(id: string, data: Partial<EventGroup>): Promise<EventGroup>;
   deleteEventGroup(id: string): Promise<void>;
+  
+  // Event Group Guest List methods
+  getEventGroupGuestLists(eventGroupId: string): Promise<EventGroupGuestList[]>;
+  addGuestListToEventGroup(eventGroupId: string, guestListId: string): Promise<EventGroupGuestList>;
+  removeGuestListFromEventGroup(eventGroupId: string, guestListId: string): Promise<void>;
   
   // Guest List methods
   getGuestListsByHostId(hostId: string): Promise<GuestList[]>;
@@ -115,7 +121,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEventsByHostId(hostId: string): Promise<Event[]> {
-    return db.select().from(events).where(eq(events.hostId, hostId)).orderBy(events.dateTime);
+    return db.select().from(events).where(eq(events.hostId, hostId)).orderBy(events.startDateTime);
   }
 
   async getEventById(id: string): Promise<Event | undefined> {
@@ -123,13 +129,18 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async createEvent(hostId: string, title: string, description: string | null, dateTime: Date, location: string | null): Promise<Event> {
+  async createEvent(hostId: string, title: string, description: string | null, startDateTime: Date, endDateTime: Date | null, location: string | null, exactAddress: string | null, customDirections: string | null, isAllDay: boolean, groupId: string | null): Promise<Event> {
     const result = await db.insert(events).values({
       hostId,
       title,
       description,
-      dateTime,
+      startDateTime,
+      endDateTime,
       location,
+      exactAddress,
+      customDirections,
+      isAllDay,
+      groupId,
     }).returning();
     return result[0];
   }
@@ -291,6 +302,33 @@ export class DatabaseStorage implements IStorage {
 
   async deleteGuestListMember(id: string): Promise<void> {
     await db.delete(guestListMembers).where(eq(guestListMembers.id, id));
+  }
+  
+  async deleteEvent(id: string): Promise<void> {
+    await db.delete(events).where(eq(events.id, id));
+  }
+  
+  // Event Group Guest List methods
+  async getEventGroupGuestLists(eventGroupId: string): Promise<EventGroupGuestList[]> {
+    return db.select().from(eventGroupGuestLists).where(eq(eventGroupGuestLists.eventGroupId, eventGroupId));
+  }
+  
+  async addGuestListToEventGroup(eventGroupId: string, guestListId: string): Promise<EventGroupGuestList> {
+    const result = await db.insert(eventGroupGuestLists).values({
+      eventGroupId,
+      guestListId,
+    }).returning();
+    return result[0];
+  }
+  
+  async removeGuestListFromEventGroup(eventGroupId: string, guestListId: string): Promise<void> {
+    await db.delete(eventGroupGuestLists)
+      .where(
+        and(
+          eq(eventGroupGuestLists.eventGroupId, eventGroupId),
+          eq(eventGroupGuestLists.guestListId, guestListId)
+        )
+      );
   }
 }
 

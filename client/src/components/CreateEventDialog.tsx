@@ -11,7 +11,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Minus, Users, FolderOpen } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button as ButtonPrimitive } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Plus, Minus, Users, FolderOpen, Clock, MapPin, Calendar, Navigation, Info } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { GuestListsDialog } from './GuestListsDialog';
 import { EventGroupsDialog } from './EventGroupsDialog';
@@ -27,10 +36,14 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    date: '',
-    time: '',
+    startDate: '',
+    startTime: '',
+    endDate: '',
+    endTime: '',
+    isAllDay: false,
     location: '',
     exactAddress: '',
+    customDirections: '',
     guests: [{ email: '', name: '' }],
     groupId: null as string | null,
   });
@@ -58,18 +71,26 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: string, value: string | boolean) => {
+    if (field === 'isAllDay') {
+      setFormData(prev => ({ ...prev, [field]: Boolean(value) }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const resetForm = () => {
     setFormData({
       title: '',
       description: '',
-      date: '',
-      time: '',
+      startDate: '',
+      startTime: '',
+      endDate: '',
+      endTime: '',
+      isAllDay: false,
       location: '',
       exactAddress: '',
+      customDirections: '',
       guests: [{ email: '', name: '' }],
       groupId: null,
     });
@@ -132,7 +153,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.title || !formData.date || !formData.time) {
+    if (!formData.title || !formData.startDate || (!formData.isAllDay && !formData.startTime)) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields.",
@@ -144,8 +165,20 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
     setIsSubmitting(true);
     
     try {
-      // Combine date and time
-      const dateTime = new Date(`${formData.date}T${formData.time}`);
+      // Prepare date/time values
+      let startDateTime, endDateTime = null;
+      
+      if (formData.isAllDay) {
+        startDateTime = new Date(`${formData.startDate}T00:00:00`);
+        if (formData.endDate) {
+          endDateTime = new Date(`${formData.endDate}T23:59:59`);
+        }
+      } else {
+        startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
+        if (formData.endDate && formData.endTime) {
+          endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
+        }
+      }
       
       const response = await fetch('/api/events', {
         method: 'POST',
@@ -156,9 +189,12 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
         body: JSON.stringify({
           title: formData.title,
           description: formData.description || null,
-          dateTime: dateTime.toISOString(),
+          startDateTime: startDateTime.toISOString(),
+          endDateTime: endDateTime ? endDateTime.toISOString() : null,
+          isAllDay: formData.isAllDay,
           location: formData.location || null,
           exactAddress: formData.exactAddress || null,
+          customDirections: formData.customDirections || null,
           groupId: formData.groupId || null,
           guests: formData.guests.filter(guest => guest.email.trim()).map(guest => ({
             email: guest.email.trim(),
@@ -194,7 +230,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Event</DialogTitle>
           <DialogDescription>
@@ -202,113 +238,198 @@ export const CreateEventDialog = ({ open, onOpenChange, onEventCreated }: Create
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Event Title *</Label>
-            <Input
-              id="title"
-              placeholder="Summer BBQ Party"
-              value={formData.title}
-              onChange={(e) => handleInputChange('title', e.target.value)}
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Join us for a fun summer BBQ with great food and company!"
-              value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              rows={3}
-            />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Full width fields at the top */}
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="date">Date *</Label>
+              <Label htmlFor="title">Event Title *</Label>
               <Input
-                id="date"
-                type="date"
-                value={formData.date}
-                onChange={(e) => handleInputChange('date', e.target.value)}
+                id="title"
+                placeholder="Summer BBQ Party"
+                value={formData.title}
+                onChange={(e) => handleInputChange('title', e.target.value)}
                 required
               />
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="time">Time *</Label>
-              <Input
-                id="time"
-                type="time"
-                value={formData.time}
-                onChange={(e) => handleInputChange('time', e.target.value)}
-                required
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Join us for a fun summer BBQ with great food and company!"
+                value={formData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                rows={3}
               />
             </div>
           </div>
+
+          {/* Two-column layout for detailed fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left Column - Event Details */}
+            <div className="space-y-4">
+              <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Event Details</h3>
           
-          <div className="space-y-2">
-            <Label htmlFor="location">Location</Label>
-            <Input
-              id="location"
-              placeholder="Community Center"
-              value={formData.location}
-              onChange={(e) => handleInputChange('location', e.target.value)}
-            />
-          </div>
+              {/* All Day Toggle */}
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="isAllDay"
+                  checked={formData.isAllDay}
+                  onCheckedChange={(checked) => handleInputChange('isAllDay', Boolean(checked))}
+                />
+                <Label htmlFor="isAllDay" className="text-sm font-medium">
+                  All Day Event
+                </Label>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="exactAddress">Exact Address (Optional)</Label>
-            <Input
-              id="exactAddress"
-              placeholder="123 Main St, City, State 12345"
-              value={formData.exactAddress}
-              onChange={(e) => handleInputChange('exactAddress', e.target.value)}
-              data-testid="input-exact-address"
-            />
-            <p className="text-xs text-muted-foreground">
-              Provide the specific address for better directions and location mapping
-            </p>
-          </div>
+              {/* Start Date and Time */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium">Event Start *</Label>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="startDate" className="text-xs">Date</Label>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) => handleInputChange('startDate', e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  {!formData.isAllDay && (
+                    <div className="space-y-2">
+                      <Label htmlFor="startTime" className="text-xs">Time</Label>
+                      <Input
+                        id="startTime"
+                        type="time"
+                        value={formData.startTime}
+                        onChange={(e) => handleInputChange('startTime', e.target.value)}
+                        required={!formData.isAllDay}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
 
-          <div className="space-y-2">
-            <Label>Event Group (Optional)</Label>
-            <div className="flex gap-2">
-              <EventGroupsDialog
-                showSelectOptions={true}
-                selectedGroupId={formData.groupId}
-                onSelectGroup={handleSelectGroup}
-              >
-                <Button type="button" variant="outline" className="flex-1" data-testid="button-select-group">
-                  <FolderOpen className="h-4 w-4 mr-2" />
-                  {selectedGroup ? selectedGroup.title : 'Select Group'}
-                </Button>
-              </EventGroupsDialog>
-              {selectedGroup && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSelectGroup('')}
-                  data-testid="button-clear-group"
-                >
-                  ✕
-                </Button>
-              )}
+              {/* End Date and Time (Optional) */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium">Event End (Optional)</Label>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="endDate" className="text-xs">Date</Label>
+                    <Input
+                      id="endDate"
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) => handleInputChange('endDate', e.target.value)}
+                    />
+                  </div>
+                  
+                  {!formData.isAllDay && (
+                    <div className="space-y-2">
+                      <Label htmlFor="endTime" className="text-xs">Time</Label>
+                      <Input
+                        id="endTime"
+                        type="time"
+                        value={formData.endTime}
+                        onChange={(e) => handleInputChange('endTime', e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            {selectedGroup && (
-              <p className="text-xs text-muted-foreground">
-                Selected: {selectedGroup.title}
-                {selectedGroup.description && ` - ${selectedGroup.description}`}
-              </p>
-            )}
+            
+            {/* Right Column - Location & Organization */}
+            <div className="space-y-4">
+              <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Location & Organization</h3>
+              
+              <div className="space-y-2">
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  placeholder="Community Center"
+                  value={formData.location}
+                  onChange={(e) => handleInputChange('location', e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="exactAddress">Exact Address (Optional)</Label>
+                <Input
+                  id="exactAddress"
+                  placeholder="123 Main St, City, State 12345"
+                  value={formData.exactAddress}
+                  onChange={(e) => handleInputChange('exactAddress', e.target.value)}
+                  data-testid="input-exact-address"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Provide the specific address for better directions and location mapping
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="customDirections">Custom Getting There Directions (Optional)</Label>
+                <Textarea
+                  id="customDirections"
+                  placeholder="Take the elevator to the 3rd floor, turn right at the coffee shop..."
+                  value={formData.customDirections}
+                  onChange={(e) => handleInputChange('customDirections', e.target.value)}
+                  rows={2}
+                  data-testid="input-custom-directions"
+                />
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Navigation className="h-3 w-3" />
+                  Provide custom directions to help guests find the venue easily
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Event Group (Optional)</Label>
+                <div className="flex gap-2">
+                  <EventGroupsDialog
+                    showSelectOptions={true}
+                    selectedGroupId={formData.groupId}
+                    onSelectGroup={handleSelectGroup}
+                  >
+                    <Button type="button" variant="outline" className="flex-1" data-testid="button-select-group">
+                      <FolderOpen className="h-4 w-4 mr-2" />
+                      {selectedGroup ? selectedGroup.title : 'Select Group'}
+                    </Button>
+                  </EventGroupsDialog>
+                  {selectedGroup && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSelectGroup('')}
+                      data-testid="button-clear-group"
+                    >
+                      ✕
+                    </Button>
+                  )}
+                </div>
+                {selectedGroup && (
+                  <p className="text-xs text-muted-foreground">
+                    Selected: {selectedGroup.title}
+                    {selectedGroup.description && ` - ${selectedGroup.description}`}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-2">
+          {/* Full-width Guest Invitations Section */}
+          <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <Label>Guest Invitations</Label>
+              <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Guest Invitations</h3>
               <GuestListsDialog
                 showInviteOptions={true}
                 onInviteGuestList={handleInviteFromGuestList}
