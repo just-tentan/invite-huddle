@@ -3,8 +3,20 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
 import { insertUserSchema, insertEventSchema, updateHostProfileSchema } from "@shared/schema";
-import { sendInvitationEmail } from "./email";
+import { sendInvitationEmail, sendCancellationEmail } from "./email";
 import { ObjectStorageService } from "./objectStorage";
+
+// Utility functions
+const formatDate = (dateString: Date) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
 
 // Session middleware setup
 declare module "express-session" {
@@ -214,6 +226,175 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(event);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update event
+  app.put("/api/events/:id", requireAuth, async (req: any, res) => {
+    try {
+      const event = await storage.getEventById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      // Check if user owns this event
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const updateData = {
+        title: req.body.title,
+        description: req.body.description,
+        dateTime: new Date(req.body.dateTime),
+        location: req.body.location,
+        exactAddress: req.body.exactAddress,
+        groupId: req.body.groupId,
+      };
+
+      const updatedEvent = await storage.updateEvent(req.params.id, updateData);
+      res.json(updatedEvent);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Cancel event
+  app.post("/api/events/:id/cancel", requireAuth, async (req: any, res) => {
+    try {
+      const event = await storage.getEventById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      // Check if user owns this event
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Update event status to cancelled
+      const cancelledEvent = await storage.updateEvent(req.params.id, { status: "cancelled" });
+
+      // Get all invitations with 'yes' RSVP status to send cancellation emails
+      const invitations = await storage.getInvitationsByEventId(req.params.id);
+      const acceptedInvitations = invitations.filter(inv => inv.rsvpStatus === 'yes' && inv.email);
+
+      // Send cancellation emails
+      for (const invitation of acceptedInvitations) {
+        if (invitation.email) {
+          try {
+            await sendCancellationEmail({
+              to: invitation.email,
+              eventTitle: event.title,
+              eventDate: formatDate(event.dateTime),
+              eventLocation: event.location || undefined,
+              hostName: host.preferredName || host.firstName || host.name || host.email,
+              guestName: invitation.name || undefined
+            });
+          } catch (error) {
+            console.error(`Failed to send cancellation email to ${invitation.email}:`, error);
+          }
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Event cancelled. ${acceptedInvitations.length} cancellation emails sent.`,
+        event: cancelledEvent
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Guest management routes
+  app.delete("/api/events/:eventId/guests/:invitationId", requireAuth, async (req: any, res) => {
+    try {
+      const { eventId, invitationId } = req.params;
+      
+      const event = await storage.getEventById(eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      // Check if user owns this event
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const invitation = await storage.getInvitationById(invitationId);
+      if (!invitation || invitation.eventId !== eventId) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      await storage.removeInvitation(invitationId);
+      res.json({ success: true, message: "Guest removed successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/events/:eventId/guests/:invitationId/suspend", requireAuth, async (req: any, res) => {
+    try {
+      const { eventId, invitationId } = req.params;
+      const { suspended } = req.body;
+      
+      const event = await storage.getEventById(eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      // Check if user owns this event
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const invitation = await storage.getInvitationById(invitationId);
+      if (!invitation || invitation.eventId !== eventId) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      await storage.updateInvitationStatus(invitationId, { suspended: suspended });
+      res.json({ 
+        success: true, 
+        message: suspended ? "Guest suspended" : "Guest suspension removed" 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/events/:eventId/guests/:invitationId/block", requireAuth, async (req: any, res) => {
+    try {
+      const { eventId, invitationId } = req.params;
+      const { blocked } = req.body;
+      
+      const event = await storage.getEventById(eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      // Check if user owns this event
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const invitation = await storage.getInvitationById(invitationId);
+      if (!invitation || invitation.eventId !== eventId) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      await storage.updateInvitationStatus(invitationId, { blocked: blocked });
+      res.json({ 
+        success: true, 
+        message: blocked ? "Guest blocked from messaging" : "Guest messaging restriction removed" 
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

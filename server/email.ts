@@ -20,6 +20,74 @@ interface InvitationEmailParams {
   baseUrl: string;
 }
 
+interface CancellationEmailParams {
+  to: string;
+  eventTitle: string;
+  eventDate: string;
+  eventLocation?: string;
+  hostName: string;
+  guestName?: string;
+}
+
+export async function sendCancellationEmail({
+  to,
+  eventTitle,
+  eventDate,
+  eventLocation,
+  hostName,
+  guestName
+}: CancellationEmailParams): Promise<boolean> {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: `EventHost <onboarding@resend.dev>`,
+      to: [to],
+      subject: `Event Cancelled: ${eventTitle}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #dc2626; margin-bottom: 20px;">Event Cancelled</h1>
+          ${guestName ? `<p style="color: #374151; margin-bottom: 20px;">Hi ${guestName},</p>` : ''}
+          
+          <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
+            <h2 style="margin: 0 0 10px 0; color: #1e293b;">${eventTitle}</h2>
+            
+            <div style="margin: 15px 0;">
+              <p style="margin: 5px 0;"><strong>📅 Was scheduled for:</strong> ${eventDate}</p>
+              ${eventLocation ? `<p style="margin: 5px 0;"><strong>📍 Location:</strong> ${eventLocation}</p>` : ''}
+              <p style="margin: 5px 0;"><strong>👤 Host:</strong> ${hostName}</p>
+            </div>
+          </div>
+
+          <p style="color: #374151; margin: 20px 0;">
+            We regret to inform you that this event has been cancelled by the host. 
+            ${guestName ? 'Thank you for your interest, and we apologize for any inconvenience.' : 'We apologize for any inconvenience this may cause.'}
+          </p>
+
+          <p style="color: #6b7280; margin: 20px 0;">
+            If you have any questions, please contact the host directly.
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          
+          <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+            Sent by EventHost - Private Event Management Platform
+          </p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('Resend cancellation email error:', error);
+      return false;
+    }
+
+    console.log('Cancellation email sent successfully:', data);
+    return true;
+  } catch (error) {
+    console.error('Error sending cancellation email:', error);
+    return false;
+  }
+}
+
 export async function sendInvitationEmail({
   to,
   eventTitle,

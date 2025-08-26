@@ -33,6 +33,36 @@ export const hosts = pgTable("hosts", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Event groups table
+export const eventGroups = pgTable("event_groups", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  hostId: uuid("host_id").notNull().references(() => hosts.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Guest lists table
+export const guestLists = pgTable("guest_lists", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  hostId: uuid("host_id").notNull().references(() => hosts.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Guest list members table
+export const guestListMembers = pgTable("guest_list_members", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  guestListId: uuid("guest_list_id").notNull().references(() => guestLists.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Events table
 export const events = pgTable("events", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -41,6 +71,9 @@ export const events = pgTable("events", {
   description: text("description"),
   dateTime: timestamp("date_time").notNull(),
   location: text("location"),
+  exactAddress: text("exact_address"),
+  status: text("status", { enum: ["upcoming", "cancelled", "past"] }).default("upcoming"),
+  groupId: uuid("group_id").references(() => eventGroups.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -55,6 +88,8 @@ export const invitations = pgTable("invitations", {
   name: text("name"),
   rsvpStatus: text("rsvp_status", { enum: ["pending", "yes", "no", "maybe"] }).default("pending"),
   isBlocked: boolean("is_blocked").default(false),
+  isSuspended: boolean("is_suspended").default(false),
+  messageBlocked: boolean("message_blocked").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -79,8 +114,37 @@ export const insertEventSchema = createInsertSchema(events).pick({
   title: true,
   description: true,
   location: true,
+  exactAddress: true,
+  groupId: true,
 }).extend({
   dateTime: z.string().transform((str) => new Date(str)),
+});
+
+export const updateEventSchema = createInsertSchema(events).pick({
+  title: true,
+  description: true,
+  location: true,
+  exactAddress: true,
+  dateTime: true,
+  status: true,
+  groupId: true,
+});
+
+export const insertEventGroupSchema = createInsertSchema(eventGroups).pick({
+  title: true,
+  description: true,
+});
+
+export const insertGuestListSchema = createInsertSchema(guestLists).pick({
+  name: true,
+  description: true,
+});
+
+export const insertGuestListMemberSchema = createInsertSchema(guestListMembers).pick({
+  guestListId: true,
+  name: true,
+  email: true,
+  phone: true,
 });
 
 export const insertInvitationSchema = createInsertSchema(invitations).pick({
@@ -112,9 +176,18 @@ export const updateHostProfileSchema = createInsertSchema(hosts).pick({
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertEvent = z.infer<typeof insertEventSchema>;
+export type UpdateEvent = z.infer<typeof updateEventSchema>;
+export type InsertEventGroup = z.infer<typeof insertEventGroupSchema>;
+export type InsertGuestList = z.infer<typeof insertGuestListSchema>;
+export type InsertGuestListMember = z.infer<typeof insertGuestListMemberSchema>;
 export type UpdateHostProfile = z.infer<typeof updateHostProfileSchema>;
+
 export type User = typeof users.$inferSelect;
 export type Host = typeof hosts.$inferSelect;
 export type Event = typeof events.$inferSelect;
+export type EventGroup = typeof eventGroups.$inferSelect;
+export type GuestList = typeof guestLists.$inferSelect;
+export type GuestListMember = typeof guestListMembers.$inferSelect;
 export type Invitation = typeof invitations.$inferSelect;
 export type EventMessage = typeof eventMessages.$inferSelect;

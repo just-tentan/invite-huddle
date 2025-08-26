@@ -20,6 +20,7 @@ export interface IStorage {
   getEventsByHostId(hostId: string): Promise<Event[]>;
   getEventById(id: string): Promise<Event | undefined>;
   createEvent(hostId: string, title: string, description: string | null, dateTime: Date, location: string | null): Promise<Event>;
+  updateEvent(id: string, updates: Partial<Event>): Promise<Event>;
   
   // Invitation methods
   createInvitation(eventId: string, email?: string, phone?: string, name?: string): Promise<Invitation>;
@@ -27,6 +28,8 @@ export interface IStorage {
   getInvitationByToken(token: string): Promise<Invitation | undefined>;
   getInvitationsByEventId(eventId: string): Promise<Invitation[]>;
   updateInvitationRSVP(token: string, rsvpStatus: string): Promise<void>;
+  removeInvitation(id: string): Promise<void>;
+  updateInvitationStatus(id: string, status: { suspended?: boolean, blocked?: boolean }): Promise<void>;
   
   // Message methods
   getEventMessages(eventId: string): Promise<EventMessage[]>;
@@ -106,6 +109,17 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async updateEvent(id: string, updates: Partial<Event>): Promise<Event> {
+    const result = await db.update(events)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(events.id, id))
+      .returning();
+    return result[0];
+  }
+
   async createInvitation(eventId: string, email?: string, phone?: string, name?: string): Promise<Invitation> {
     const token = crypto.randomBytes(32).toString('base64url');
     const result = await db.insert(invitations).values({
@@ -136,6 +150,20 @@ export class DatabaseStorage implements IStorage {
     await db.update(invitations)
       .set({ rsvpStatus })
       .where(eq(invitations.token, token));
+  }
+
+  async removeInvitation(id: string): Promise<void> {
+    await db.delete(invitations).where(eq(invitations.id, id));
+  }
+
+  async updateInvitationStatus(id: string, status: { suspended?: boolean, blocked?: boolean }): Promise<void> {
+    await db.update(invitations)
+      .set({
+        isSuspended: status.suspended,
+        messageBlocked: status.blocked,
+        updatedAt: new Date()
+      })
+      .where(eq(invitations.id, id));
   }
 
   async getEventMessages(eventId: string): Promise<EventMessage[]> {

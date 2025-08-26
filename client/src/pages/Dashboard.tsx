@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
-import { Plus, Calendar, Users, MessageCircle, LogOut, User } from 'lucide-react';
+import { Plus, Calendar, Users, MessageCircle, LogOut, User, Search, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { CreateEventDialog } from '@/components/CreateEventDialog';
 import { HostProfileDialog } from '@/components/HostProfileDialog';
@@ -16,6 +17,7 @@ interface Event {
   date_time: string;
   location: string | null;
   created_at: string;
+  status: string | null;
   rsvpCounts: {
     total: number;
     yes: number;
@@ -32,6 +34,8 @@ const Dashboard = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [host, setHost] = useState<Host | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'upcoming' | 'past' | 'cancelled'>('upcoming');
 
   useEffect(() => {
     if (user) {
@@ -109,6 +113,22 @@ const Dashboard = () => {
     });
   };
 
+  const getEventStatus = (event: Event) => {
+    if (event.status === 'cancelled') return 'cancelled';
+    return new Date(event.date_time) > new Date() ? 'upcoming' : 'past';
+  };
+
+  const filteredEvents = events.filter((event) => {
+    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         (event.location && event.location.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const eventStatus = getEventStatus(event);
+    const matchesFilter = filterStatus === 'all' || eventStatus === filterStatus;
+    
+    return matchesSearch && matchesFilter;
+  });
+
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b">
@@ -169,10 +189,80 @@ const Dashboard = () => {
           </p>
         </div>
 
+        {/* Search and Filter Controls */}
+        <div className="mb-6 space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search events by title, description, or location..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-events"
+            />
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={filterStatus === 'upcoming' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilterStatus('upcoming')}
+              data-testid="button-filter-upcoming"
+            >
+              <Calendar className="h-3 w-3 mr-1" />
+              Upcoming ({events.filter(e => getEventStatus(e) === 'upcoming').length})
+            </Button>
+            <Button
+              variant={filterStatus === 'past' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilterStatus('past')}
+              data-testid="button-filter-past"
+            >
+              <Filter className="h-3 w-3 mr-1" />
+              Past ({events.filter(e => getEventStatus(e) === 'past').length})
+            </Button>
+            <Button
+              variant={filterStatus === 'cancelled' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilterStatus('cancelled')}
+              data-testid="button-filter-cancelled"
+            >
+              Cancelled ({events.filter(e => getEventStatus(e) === 'cancelled').length})
+            </Button>
+            <Button
+              variant={filterStatus === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilterStatus('all')}
+              data-testid="button-filter-all"
+            >
+              All Events ({events.length})
+            </Button>
+          </div>
+        </div>
+
         {loadingEvents ? (
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
+        ) : filteredEvents.length === 0 && events.length > 0 ? (
+          <Card className="text-center py-8">
+            <CardContent className="pt-6">
+              <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No events found</h3>
+              <p className="text-muted-foreground mb-4">
+                Try adjusting your search terms or filters
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilterStatus('all');
+                }}
+              >
+                Clear Filters
+              </Button>
+            </CardContent>
+          </Card>
         ) : events.length === 0 ? (
           <Card className="text-center py-8">
             <CardContent className="pt-6">
@@ -189,13 +279,19 @@ const Dashboard = () => {
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {events.map((event) => (
+            {filteredEvents.map((event) => (
               <Card key={event.id} className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg">{event.title}</CardTitle>
-                    <Badge variant="outline">
-                      {new Date(event.date_time) > new Date() ? 'Upcoming' : 'Past'}
+                    <Badge 
+                      variant={
+                        getEventStatus(event) === 'cancelled' ? 'destructive' :
+                        getEventStatus(event) === 'upcoming' ? 'default' : 'secondary'
+                      }
+                    >
+                      {getEventStatus(event) === 'cancelled' ? 'Cancelled' :
+                       getEventStatus(event) === 'upcoming' ? 'Upcoming' : 'Past'}
                     </Badge>
                   </div>
                   <CardDescription className="text-sm">

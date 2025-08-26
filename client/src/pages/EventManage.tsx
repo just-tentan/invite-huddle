@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'wouter';
 import { Link } from 'wouter';
-import { Calendar, MapPin, Users, MessageCircle, ArrowLeft, Copy, CheckCircle, Mail, Plus, Send, Minus } from 'lucide-react';
+import { Calendar, MapPin, Users, MessageCircle, ArrowLeft, Copy, CheckCircle, Mail, Plus, Send, Minus, Edit, Trash2, X, MoreVertical, UserMinus, Ban, MessageSquareOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { EventChat } from '@/components/EventChat';
@@ -18,6 +19,8 @@ interface Event {
   description: string | null;
   dateTime: string;
   location: string | null;
+  exactAddress: string | null;
+  status: string | null;
 }
 
 interface Invitation {
@@ -26,6 +29,8 @@ interface Invitation {
   email: string | null;
   name: string | null;
   rsvpStatus: "pending" | "yes" | "no" | "maybe";
+  isSuspended: boolean | null;
+  messageBlocked: boolean | null;
 }
 
 const EventManage = () => {
@@ -38,12 +43,35 @@ const EventManage = () => {
   const [isResending, setIsResending] = useState(false);
   const [resendingInvitations, setResendingInvitations] = useState<Set<string>>(new Set());
   const [newGuests, setNewGuests] = useState([{ email: '', name: '' }]);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    dateTime: '',
+    location: '',
+    exactAddress: ''
+  });
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user && id) {
       fetchEventData();
     }
   }, [user, id]);
+
+  useEffect(() => {
+    if (event && isEditDialogOpen) {
+      setEditForm({
+        title: event.title,
+        description: event.description || '',
+        dateTime: new Date(event.dateTime).toISOString().slice(0, 16),
+        location: event.location || '',
+        exactAddress: event.exactAddress || ''
+      });
+    }
+  }, [event, isEditDialogOpen]);
 
   const fetchEventData = async () => {
     try {
@@ -243,6 +271,192 @@ const EventManage = () => {
     setNewGuests(prev => prev.map((guest, i) => i === index ? { ...guest, [field]: value } : guest));
   };
 
+  const handleEditEvent = async () => {
+    if (!editForm.title || !editForm.dateTime) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsEditing(true);
+    try {
+      const response = await fetch(`/api/events/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: editForm.title,
+          description: editForm.description || null,
+          dateTime: editForm.dateTime,
+          location: editForm.location || null,
+          exactAddress: editForm.exactAddress || null,
+        }),
+      });
+
+      if (response.ok) {
+        const updatedEvent = await response.json();
+        setEvent(updatedEvent);
+        setIsEditDialogOpen(false);
+        toast({
+          title: "Event Updated",
+          description: "Your event has been updated successfully.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to update event. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  const handleCancelEvent = async () => {
+    setIsCancelling(true);
+    try {
+      const response = await fetch(`/api/events/${id}/cancel`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setEvent(result.event);
+        setIsCancelDialogOpen(false);
+        toast({
+          title: "Event Cancelled",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to cancel event. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleRemoveGuest = async (invitationId: string, guestName: string) => {
+    try {
+      const response = await fetch(`/api/events/${id}/guests/${invitationId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        await fetchEventData(); // Refresh invitations
+        toast({
+          title: "Guest Removed",
+          description: `${guestName} has been removed from the event.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to remove guest. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSuspendGuest = async (invitationId: string, guestName: string, suspend: boolean) => {
+    try {
+      const response = await fetch(`/api/events/${id}/guests/${invitationId}/suspend`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ suspended: suspend }),
+      });
+
+      if (response.ok) {
+        await fetchEventData(); // Refresh invitations
+        toast({
+          title: suspend ? "Guest Suspended" : "Suspension Removed",
+          description: suspend 
+            ? `${guestName} has been suspended from the event.`
+            : `${guestName}'s suspension has been removed.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to update guest status. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBlockGuest = async (invitationId: string, guestName: string, block: boolean) => {
+    try {
+      const response = await fetch(`/api/events/${id}/guests/${invitationId}/block`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ blocked: block }),
+      });
+
+      if (response.ok) {
+        await fetchEventData(); // Refresh invitations
+        toast({
+          title: block ? "Guest Blocked" : "Block Removed",
+          description: block 
+            ? `${guestName} has been blocked from messaging.`
+            : `${guestName}'s messaging block has been removed.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to update guest status. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading || loadingEvent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -305,8 +519,32 @@ const EventManage = () => {
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-2xl">{event.title}</CardTitle>
-                <CardDescription>Event Details</CardDescription>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-2xl">{event.title}</CardTitle>
+                    <CardDescription>Event Details</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditDialogOpen(true)}
+                      data-testid="button-edit-event"
+                    >
+                      <Edit className="h-3 w-3 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsCancelDialogOpen(true)}
+                      data-testid="button-cancel-event"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {event.description && (
@@ -488,12 +726,24 @@ const EventManage = () => {
                           <p className="text-sm font-medium truncate">
                             {invitation.name ? `${invitation.name} (${invitation.email})` : invitation.email || 'Anonymous Guest'}
                           </p>
-                          <Badge 
-                            className={`text-xs mt-1 ${getRSVPBadgeColor(invitation.rsvpStatus)}`}
-                            variant="secondary"
-                          >
-                            {invitation.rsvpStatus.toUpperCase()}
-                          </Badge>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            <Badge 
+                              className={`text-xs ${getRSVPBadgeColor(invitation.rsvpStatus)}`}
+                              variant="secondary"
+                            >
+                              {invitation.rsvpStatus.toUpperCase()}
+                            </Badge>
+                            {invitation.isSuspended && (
+                              <Badge variant="destructive" className="text-xs">
+                                SUSPENDED
+                              </Badge>
+                            )}
+                            {invitation.messageBlocked && (
+                              <Badge variant="outline" className="text-xs">
+                                NO MESSAGES
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                         <div className="flex gap-1 ml-2">
                           {invitation.rsvpStatus === 'pending' && (
@@ -513,6 +763,46 @@ const EventManage = () => {
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="outline" data-testid={`button-guest-menu-${invitation.id}`}>
+                                <MoreVertical className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleSuspendGuest(
+                                  invitation.id,
+                                  invitation.name || invitation.email || 'Anonymous Guest',
+                                  !invitation.isSuspended
+                                )}
+                              >
+                                <Ban className="h-3 w-3 mr-2" />
+                                {invitation.isSuspended ? 'Remove Suspension' : 'Suspend Guest'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleBlockGuest(
+                                  invitation.id,
+                                  invitation.name || invitation.email || 'Anonymous Guest',
+                                  !invitation.messageBlocked
+                                )}
+                              >
+                                <MessageSquareOff className="h-3 w-3 mr-2" />
+                                {invitation.messageBlocked ? 'Allow Messages' : 'Block Messages'}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleRemoveGuest(
+                                  invitation.id,
+                                  invitation.name || invitation.email || 'Anonymous Guest'
+                                )}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <UserMinus className="h-3 w-3 mr-2" />
+                                Remove Guest
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     ))}
@@ -523,6 +813,116 @@ const EventManage = () => {
           </div>
         </div>
       </div>
+
+      {/* Edit Event Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Event</DialogTitle>
+            <DialogDescription>
+              Make changes to your event details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Event Title *</Label>
+              <Input
+                id="edit-title"
+                value={editForm.title}
+                onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter event title"
+                data-testid="input-edit-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Input
+                id="edit-description"
+                value={editForm.description}
+                onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Event description (optional)"
+                data-testid="input-edit-description"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-datetime">Date & Time *</Label>
+              <Input
+                id="edit-datetime"
+                type="datetime-local"
+                value={editForm.dateTime}
+                onChange={(e) => setEditForm(prev => ({ ...prev, dateTime: e.target.value }))}
+                data-testid="input-edit-datetime"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-location">Location</Label>
+              <Input
+                id="edit-location"
+                value={editForm.location}
+                onChange={(e) => setEditForm(prev => ({ ...prev, location: e.target.value }))}
+                placeholder="Event location (optional)"
+                data-testid="input-edit-location"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-address">Exact Address</Label>
+              <Input
+                id="edit-address"
+                value={editForm.exactAddress}
+                onChange={(e) => setEditForm(prev => ({ ...prev, exactAddress: e.target.value }))}
+                placeholder="Full address for navigation (optional)"
+                data-testid="input-edit-address"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditEvent} disabled={isEditing}>
+              {isEditing ? 'Updating...' : 'Update Event'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Event Confirmation Dialog */}
+      <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel Event</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this event? This action cannot be undone and cancellation emails will be sent to all guests who have RSVP'd "Yes".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+              <div className="flex items-center gap-2 text-destructive">
+                <X className="h-4 w-4" />
+                <span className="font-semibold">This will:</span>
+              </div>
+              <ul className="mt-2 text-sm text-destructive/80 space-y-1 ml-6">
+                <li>• Mark the event as cancelled</li>
+                <li>• Send cancellation emails to all "Yes" RSVPs</li>
+                <li>• Make the event non-editable</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCancelDialogOpen(false)}>
+              Keep Event
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleCancelEvent} 
+              disabled={isCancelling}
+              data-testid="button-confirm-cancel"
+            >
+              {isCancelling ? 'Cancelling...' : 'Cancel Event'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
