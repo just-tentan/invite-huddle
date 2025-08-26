@@ -17,9 +17,12 @@ interface Event {
   id: string;
   title: string;
   description: string | null;
-  dateTime: string;
+  startDateTime: string;
+  endDateTime: string | null;
+  isAllDay: boolean;
   location: string | null;
   exactAddress: string | null;
+  customDirections: string | null;
   status: string | null;
 }
 
@@ -48,9 +51,12 @@ const EventManage = () => {
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
-    dateTime: '',
+    startDateTime: '',
+    endDateTime: '',
+    isAllDay: false,
     location: '',
-    exactAddress: ''
+    exactAddress: '',
+    customDirections: ''
   });
   const [isCancelling, setIsCancelling] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
@@ -68,9 +74,12 @@ const EventManage = () => {
       setEditForm({
         title: event.title,
         description: event.description || '',
-        dateTime: new Date(event.dateTime).toISOString().slice(0, 16),
+        startDateTime: new Date(event.startDateTime).toISOString().slice(0, 16),
+        endDateTime: event.endDateTime ? new Date(event.endDateTime).toISOString().slice(0, 16) : '',
+        isAllDay: event.isAllDay,
         location: event.location || '',
-        exactAddress: event.exactAddress || ''
+        exactAddress: event.exactAddress || '',
+        customDirections: event.customDirections || ''
       });
     }
   }, [event, isEditDialogOpen]);
@@ -107,15 +116,48 @@ const EventManage = () => {
     });
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (startDateString: string, endDateString?: string | null, isAllDay: boolean = false) => {
+    if (!startDateString) return 'Invalid Date';
+    
+    const startDate = new Date(startDateString);
+    if (isNaN(startDate.getTime())) return 'Invalid Date';
+    
+    const formatOptions: Intl.DateTimeFormatOptions = {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+      day: 'numeric'
+    };
+    
+    if (!isAllDay) {
+      formatOptions.hour = '2-digit';
+      formatOptions.minute = '2-digit';
+    }
+    
+    let dateStr = startDate.toLocaleDateString('en-US', formatOptions);
+    
+    if (endDateString) {
+      const endDate = new Date(endDateString);
+      if (!isNaN(endDate.getTime())) {
+        if (startDate.toDateString() === endDate.toDateString()) {
+          // Same day event - show end time only
+          if (!isAllDay) {
+            const endTimeStr = endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            dateStr += ` - ${endTimeStr}`;
+          }
+        } else {
+          // Multi-day event
+          const endDateStr = endDate.toLocaleDateString('en-US', formatOptions);
+          dateStr += ` - ${endDateStr}`;
+        }
+      }
+    }
+    
+    if (isAllDay) {
+      dateStr += ' (All Day)';
+    }
+    
+    return dateStr;
   };
 
   const getRSVPBadgeColor = (status: string) => {
@@ -274,7 +316,7 @@ const EventManage = () => {
   };
 
   const handleEditEvent = async () => {
-    if (!editForm.title || !editForm.dateTime) {
+    if (!editForm.title || !editForm.startDateTime) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields.",
@@ -294,9 +336,12 @@ const EventManage = () => {
         body: JSON.stringify({
           title: editForm.title,
           description: editForm.description || null,
-          dateTime: editForm.dateTime,
+          startDateTime: editForm.startDateTime,
+          endDateTime: editForm.endDateTime || null,
+          isAllDay: editForm.isAllDay,
           location: editForm.location || null,
           exactAddress: editForm.exactAddress || null,
+          customDirections: editForm.customDirections || null,
         }),
       });
 
@@ -605,7 +650,7 @@ const EventManage = () => {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{formatDate(event.dateTime)}</span>
+                    <span className="text-sm">{formatDate(event.startDateTime, event.endDateTime, event.isAllDay)}</span>
                   </div>
                   
                   {event.location && (
@@ -900,8 +945,8 @@ const EventManage = () => {
               <Input
                 id="edit-datetime"
                 type="datetime-local"
-                value={editForm.dateTime}
-                onChange={(e) => setEditForm(prev => ({ ...prev, dateTime: e.target.value }))}
+                value={editForm.startDateTime}
+                onChange={(e) => setEditForm(prev => ({ ...prev, startDateTime: e.target.value }))}
                 data-testid="input-edit-datetime"
               />
             </div>

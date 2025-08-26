@@ -16,7 +16,9 @@ interface Event {
   id: string;
   title: string;
   description: string | null;
-  date_time: string;
+  startDateTime: string;
+  endDateTime: string | null;
+  isAllDay: boolean;
   location: string | null;
   created_at: string;
   status: string | null;
@@ -69,10 +71,12 @@ const Dashboard = () => {
 
       if (response.ok) {
         const data = await response.json();
-        // Convert date_time field names to match our API response format
+        // Map API response to interface format
         const formattedEvents = data.map((event: any) => ({
           ...event,
-          date_time: event.dateTime,
+          startDateTime: event.startDateTime,
+          endDateTime: event.endDateTime,
+          isAllDay: event.isAllDay,
           created_at: event.createdAt,
           rsvpCounts: event.rsvpCounts,
           messageCount: event.messageCount
@@ -104,20 +108,53 @@ const Dashboard = () => {
     return null;
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (startDateString: string, endDateString?: string | null, isAllDay: boolean = false) => {
+    if (!startDateString) return 'Invalid Date';
+    
+    const startDate = new Date(startDateString);
+    if (isNaN(startDate.getTime())) return 'Invalid Date';
+    
+    const formatOptions: Intl.DateTimeFormatOptions = {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+      day: 'numeric'
+    };
+    
+    if (!isAllDay) {
+      formatOptions.hour = '2-digit';
+      formatOptions.minute = '2-digit';
+    }
+    
+    let dateStr = startDate.toLocaleDateString('en-US', formatOptions);
+    
+    if (endDateString) {
+      const endDate = new Date(endDateString);
+      if (!isNaN(endDate.getTime())) {
+        if (startDate.toDateString() === endDate.toDateString()) {
+          // Same day event - show end time only
+          if (!isAllDay) {
+            const endTimeStr = endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            dateStr += ` - ${endTimeStr}`;
+          }
+        } else {
+          // Multi-day event
+          const endDateStr = endDate.toLocaleDateString('en-US', formatOptions);
+          dateStr += ` - ${endDateStr}`;
+        }
+      }
+    }
+    
+    if (isAllDay) {
+      dateStr += ' (All Day)';
+    }
+    
+    return dateStr;
   };
 
   const getEventStatus = (event: Event) => {
     if (event.status === 'cancelled') return 'cancelled';
-    return new Date(event.date_time) > new Date() ? 'upcoming' : 'past';
+    return new Date(event.startDateTime) > new Date() ? 'upcoming' : 'past';
   };
 
   const filteredEvents = events.filter((event) => {
@@ -313,7 +350,7 @@ const Dashboard = () => {
                     </Badge>
                   </div>
                   <CardDescription className="text-sm">
-                    {formatDate(event.date_time)}
+                    {formatDate(event.startDateTime, event.endDateTime, event.isAllDay)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
