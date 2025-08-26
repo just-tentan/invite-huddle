@@ -26,16 +26,17 @@ export function HostProfileDialog({ host, onHostUpdate, children }: HostProfileD
   const form = useForm<UpdateHostProfile>({
     resolver: zodResolver(updateHostProfileSchema),
     defaultValues: {
-      firstName: host.firstName || '',
-      lastName: host.lastName || '',
-      preferredName: host.preferredName || '',
-      contact: host.contact || '',
-      pictureUrl: host.pictureUrl || '',
-      facebookUrl: host.facebookUrl || '',
-      instagramUrl: host.instagramUrl || '',
-      twitterUrl: host.twitterUrl || '',
-      linkedinUrl: host.linkedinUrl || '',
-      websiteUrl: host.websiteUrl || '',
+      firstName: host.firstName ?? '',
+      lastName: host.lastName ?? '',
+      preferredName: host.preferredName ?? '',
+      contact: host.contact ?? '',
+      pictureUrl: host.pictureUrl ?? '',
+      facebookUrl: host.facebookUrl ?? '',
+      instagramUrl: host.instagramUrl ?? '',
+      twitterUrl: host.twitterUrl ?? '',
+      linkedinUrl: host.linkedinUrl ?? '',
+      websiteUrl: host.websiteUrl ?? '',
+      personalStatement: host.personalStatement ?? '',
     },
   });
 
@@ -237,6 +238,24 @@ export function HostProfileDialog({ host, onHostUpdate, children }: HostProfileD
                   <FormLabel>Contact</FormLabel>
                   <FormControl>
                     <Input placeholder="Phone number or additional contact" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="personalStatement"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Personal Statement</FormLabel>
+                  <FormControl>
+                    <textarea
+                      className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="Tell guests a bit about yourself..."
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

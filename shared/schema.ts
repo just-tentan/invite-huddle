@@ -27,6 +27,7 @@ export const hosts = pgTable("hosts", {
   twitterUrl: text("twitter_url"),
   linkedinUrl: text("linkedin_url"),
   websiteUrl: text("website_url"),
+  personalStatement: text("personal_statement"),
   verified: boolean("verified").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -107,6 +108,7 @@ export const updateHostProfileSchema = createInsertSchema(hosts).pick({
   twitterUrl: true,
   linkedinUrl: true,
   websiteUrl: true,
+  personalStatement: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

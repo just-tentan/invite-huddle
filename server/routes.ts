@@ -159,7 +159,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             invitations.push(invitation);
             
             // Send invitation email
-            const inviteUrl = `${req.protocol}://${req.get('host')}/invite/${invitation.token}`;
+            const baseUrlForLinks = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`;
+            const inviteUrl = `${baseUrlForLinks}/invite/${invitation.token}`;
             const formatDate = (dateString: Date) => {
               return new Date(dateString).toLocaleDateString('en-US', {
                 weekday: 'long',
@@ -181,9 +182,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 inviteUrl,
                 hostEmail: req.user.email,
                 guestName: guest.name || undefined,
-                hostName: host.name || undefined,
+                hostName: host.preferredName || host.firstName || host.name || undefined,
                 token: invitation.token,
-                baseUrl: `${req.protocol}://${req.get('host')}`
+                baseUrl: process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`
               });
             } catch (error) {
               console.error(`Failed to send invitation to ${guest.email}:`, error);
@@ -314,7 +315,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const invitation of pendingInvitations) {
         if (invitation.email) {
-          const inviteUrl = `${req.protocol}://${req.get('host')}/invite/${invitation.token}`;
+          const baseUrlForLinks = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`;
+          const inviteUrl = `${baseUrlForLinks}/invite/${invitation.token}`;
           const formatDate = (dateString: Date) => {
             return new Date(dateString).toLocaleDateString('en-US', {
               weekday: 'long',
@@ -338,7 +340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               guestName: invitation.name || undefined,
               hostName: host.name || undefined,
               token: invitation.token,
-              baseUrl: `${req.protocol}://${req.get('host')}`
+              baseUrl: process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`
             });
             sentCount++;
           } catch (error) {
@@ -410,7 +412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               guestName: guest.name || undefined,
               hostName: host.name || undefined,
               token: invitation.token,
-              baseUrl: `${req.protocol}://${req.get('host')}`
+              baseUrl: process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`
             });
           } catch (error) {
             console.error(`Failed to send invitation to ${guest.email}:`, error);
@@ -446,7 +448,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No email address for this invitation" });
       }
 
-      const inviteUrl = `${req.protocol}://${req.get('host')}/invite/${invitation.token}`;
+      const baseUrlForLinks = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`;
+      const inviteUrl = `${baseUrlForLinks}/invite/${invitation.token}`;
       const formatDate = (dateString: Date) => {
         return new Date(dateString).toLocaleDateString('en-US', {
           weekday: 'long',
@@ -468,7 +471,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inviteUrl,
           hostEmail: req.user.email,
           guestName: invitation.name || undefined,
-          hostName: host.name || undefined
+          hostName: host.preferredName || host.firstName || host.name || undefined,
+          token: invitation.token,
+          baseUrl: baseUrlForLinks
         });
 
         res.json({ 
