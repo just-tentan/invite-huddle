@@ -1,6 +1,11 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { users, hosts, events, invitations, eventMessages, type User, type InsertUser, type Host, type Event, type Invitation, type EventMessage, type UpdateHostProfile } from "@shared/schema";
+import { 
+  users, hosts, events, invitations, eventMessages, eventGroups, guestLists, guestListMembers,
+  type User, type InsertUser, type Host, type Event, type Invitation, type EventMessage, 
+  type EventGroup, type GuestList, type GuestListMember, type UpdateHostProfile, 
+  type InsertEventGroup, type InsertGuestList, type InsertGuestListMember
+} from "@shared/schema";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -34,6 +39,26 @@ export interface IStorage {
   // Message methods
   getEventMessages(eventId: string): Promise<EventMessage[]>;
   createEventMessage(eventId: string, senderType: "host" | "guest", senderId: string | null, message: string): Promise<EventMessage>;
+  
+  // Event Group methods
+  getEventGroupsByHostId(hostId: string): Promise<EventGroup[]>;
+  getEventGroupById(id: string): Promise<EventGroup | undefined>;
+  createEventGroup(hostId: string, data: InsertEventGroup): Promise<EventGroup>;
+  updateEventGroup(id: string, data: Partial<EventGroup>): Promise<EventGroup>;
+  deleteEventGroup(id: string): Promise<void>;
+  
+  // Guest List methods
+  getGuestListsByHostId(hostId: string): Promise<GuestList[]>;
+  getGuestListById(id: string): Promise<GuestList | undefined>;
+  createGuestList(hostId: string, data: InsertGuestList): Promise<GuestList>;
+  updateGuestList(id: string, data: Partial<GuestList>): Promise<GuestList>;
+  deleteGuestList(id: string): Promise<void>;
+  
+  // Guest List Member methods
+  getGuestListMembers(guestListId: string): Promise<GuestListMember[]>;
+  createGuestListMember(data: InsertGuestListMember): Promise<GuestListMember>;
+  updateGuestListMember(id: string, data: Partial<GuestListMember>): Promise<GuestListMember>;
+  deleteGuestListMember(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -178,6 +203,94 @@ export class DatabaseStorage implements IStorage {
       message,
     }).returning();
     return result[0];
+  }
+
+  // Event Group methods
+  async getEventGroupsByHostId(hostId: string): Promise<EventGroup[]> {
+    return db.select().from(eventGroups).where(eq(eventGroups.hostId, hostId)).orderBy(eventGroups.createdAt);
+  }
+
+  async getEventGroupById(id: string): Promise<EventGroup | undefined> {
+    const result = await db.select().from(eventGroups).where(eq(eventGroups.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createEventGroup(hostId: string, data: InsertEventGroup): Promise<EventGroup> {
+    const result = await db.insert(eventGroups).values({
+      hostId,
+      ...data,
+    }).returning();
+    return result[0];
+  }
+
+  async updateEventGroup(id: string, data: Partial<EventGroup>): Promise<EventGroup> {
+    const result = await db.update(eventGroups)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(eventGroups.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteEventGroup(id: string): Promise<void> {
+    await db.delete(eventGroups).where(eq(eventGroups.id, id));
+  }
+
+  // Guest List methods
+  async getGuestListsByHostId(hostId: string): Promise<GuestList[]> {
+    return db.select().from(guestLists).where(eq(guestLists.hostId, hostId)).orderBy(guestLists.createdAt);
+  }
+
+  async getGuestListById(id: string): Promise<GuestList | undefined> {
+    const result = await db.select().from(guestLists).where(eq(guestLists.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createGuestList(hostId: string, data: InsertGuestList): Promise<GuestList> {
+    const result = await db.insert(guestLists).values({
+      hostId,
+      ...data,
+    }).returning();
+    return result[0];
+  }
+
+  async updateGuestList(id: string, data: Partial<GuestList>): Promise<GuestList> {
+    const result = await db.update(guestLists)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(guestLists.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteGuestList(id: string): Promise<void> {
+    await db.delete(guestLists).where(eq(guestLists.id, id));
+  }
+
+  // Guest List Member methods
+  async getGuestListMembers(guestListId: string): Promise<GuestListMember[]> {
+    return db.select().from(guestListMembers).where(eq(guestListMembers.guestListId, guestListId)).orderBy(guestListMembers.createdAt);
+  }
+
+  async createGuestListMember(data: InsertGuestListMember): Promise<GuestListMember> {
+    const result = await db.insert(guestListMembers).values(data).returning();
+    return result[0];
+  }
+
+  async updateGuestListMember(id: string, data: Partial<GuestListMember>): Promise<GuestListMember> {
+    const result = await db.update(guestListMembers)
+      .set(data)
+      .where(eq(guestListMembers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteGuestListMember(id: string): Promise<void> {
+    await db.delete(guestListMembers).where(eq(guestListMembers.id, id));
   }
 }
 

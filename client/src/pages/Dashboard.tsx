@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
-import { Plus, Calendar, Users, MessageCircle, LogOut, User, Search, Filter } from 'lucide-react';
+import { Plus, Calendar, Users, MessageCircle, LogOut, User, Search, Filter, FolderOpen, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { CreateEventDialog } from '@/components/CreateEventDialog';
 import { HostProfileDialog } from '@/components/HostProfileDialog';
+import { GuestListsDialog } from '@/components/GuestListsDialog';
+import { EventGroupsDialog } from '@/components/EventGroupsDialog';
 import type { Host } from '@shared/schema';
 
 interface Event {
@@ -162,9 +164,25 @@ const Dashboard = () => {
                 </Button>
               </HostProfileDialog>
             )}
+            
+            <GuestListsDialog>
+              <Button variant="outline" size="sm" data-testid="button-manage-guest-lists">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Guest Lists
+              </Button>
+            </GuestListsDialog>
+            
+            <EventGroupsDialog>
+              <Button variant="outline" size="sm" data-testid="button-manage-event-groups">
+                <FolderOpen className="h-4 w-4 mr-2" />
+                Event Groups
+              </Button>
+            </EventGroupsDialog>
+            
             <Button
               onClick={() => setIsCreateDialogOpen(true)}
               className="flex items-center gap-2"
+              data-testid="button-create-event"
             >
               <Plus className="h-4 w-4" />
               Create Event

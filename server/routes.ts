@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
-import { insertUserSchema, insertEventSchema, updateHostProfileSchema } from "@shared/schema";
+import { insertUserSchema, insertEventSchema, updateHostProfileSchema, insertEventGroupSchema, insertGuestListSchema, insertGuestListMemberSchema } from "@shared/schema";
 import { sendInvitationEmail, sendCancellationEmail } from "./email";
 import { ObjectStorageService } from "./objectStorage";
 
@@ -837,6 +837,301 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.sendStatus(404);
       }
       return res.sendStatus(500);
+    }
+  });
+
+  // Event Group routes
+  app.get("/api/event-groups", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const eventGroups = await storage.getEventGroupsByHostId(host.id);
+      res.json(eventGroups);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/event-groups", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const eventGroup = await storage.createEventGroup(host.id, req.body);
+      res.status(201).json(eventGroup);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/event-groups/:id", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const eventGroup = await storage.getEventGroupById(req.params.id);
+      if (!eventGroup || eventGroup.hostId !== host.id) {
+        return res.status(404).json({ error: "Event group not found" });
+      }
+
+      const updatedGroup = await storage.updateEventGroup(req.params.id, req.body);
+      res.json(updatedGroup);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/event-groups/:id", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const eventGroup = await storage.getEventGroupById(req.params.id);
+      if (!eventGroup || eventGroup.hostId !== host.id) {
+        return res.status(404).json({ error: "Event group not found" });
+      }
+
+      await storage.deleteEventGroup(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Guest List routes
+  app.get("/api/guest-lists", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const guestLists = await storage.getGuestListsByHostId(host.id);
+      
+      // Add member counts for each guest list
+      const guestListsWithCounts = await Promise.all(guestLists.map(async (list) => {
+        const members = await storage.getGuestListMembers(list.id);
+        return {
+          ...list,
+          memberCount: members.length
+        };
+      }));
+      
+      res.json(guestListsWithCounts);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/guest-lists", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const guestList = await storage.createGuestList(host.id, req.body);
+      res.status(201).json({ ...guestList, memberCount: 0 });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/guest-lists/:id", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const guestList = await storage.getGuestListById(req.params.id);
+      if (!guestList || guestList.hostId !== host.id) {
+        return res.status(404).json({ error: "Guest list not found" });
+      }
+
+      const updatedList = await storage.updateGuestList(req.params.id, req.body);
+      const members = await storage.getGuestListMembers(updatedList.id);
+      res.json({ ...updatedList, memberCount: members.length });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/guest-lists/:id", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const guestList = await storage.getGuestListById(req.params.id);
+      if (!guestList || guestList.hostId !== host.id) {
+        return res.status(404).json({ error: "Guest list not found" });
+      }
+
+      await storage.deleteGuestList(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Guest List Member routes
+  app.get("/api/guest-lists/:id/members", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const guestList = await storage.getGuestListById(req.params.id);
+      if (!guestList || guestList.hostId !== host.id) {
+        return res.status(404).json({ error: "Guest list not found" });
+      }
+
+      const members = await storage.getGuestListMembers(req.params.id);
+      res.json(members);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/guest-lists/:id/members", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const guestList = await storage.getGuestListById(req.params.id);
+      if (!guestList || guestList.hostId !== host.id) {
+        return res.status(404).json({ error: "Guest list not found" });
+      }
+
+      const memberData = {
+        ...req.body,
+        guestListId: req.params.id
+      };
+
+      const member = await storage.createGuestListMember(memberData);
+      res.status(201).json(member);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/guest-lists/:listId/members/:memberId", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const guestList = await storage.getGuestListById(req.params.listId);
+      if (!guestList || guestList.hostId !== host.id) {
+        return res.status(404).json({ error: "Guest list not found" });
+      }
+
+      const member = await storage.updateGuestListMember(req.params.memberId, req.body);
+      res.json(member);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/guest-lists/:listId/members/:memberId", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const guestList = await storage.getGuestListById(req.params.listId);
+      if (!guestList || guestList.hostId !== host.id) {
+        return res.status(404).json({ error: "Guest list not found" });
+      }
+
+      await storage.deleteGuestListMember(req.params.memberId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Bulk invite from guest list
+  app.post("/api/guest-lists/:id/invite-to-event", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const { eventId } = req.body;
+      if (!eventId) {
+        return res.status(400).json({ error: "Event ID is required" });
+      }
+
+      const [guestList, event] = await Promise.all([
+        storage.getGuestListById(req.params.id),
+        storage.getEventById(eventId)
+      ]);
+
+      if (!guestList || guestList.hostId !== host.id) {
+        return res.status(404).json({ error: "Guest list not found" });
+      }
+
+      if (!event || event.hostId !== host.id) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const members = await storage.getGuestListMembers(req.params.id);
+      const invitations = [];
+
+      for (const member of members) {
+        const invitation = await storage.createInvitation(
+          eventId,
+          member.email,
+          member.phone || undefined,
+          member.name
+        );
+        invitations.push(invitation);
+
+        // Send invitation email
+        try {
+          await sendInvitationEmail({
+            to: member.email,
+            eventTitle: event.title,
+            eventDescription: event.description || undefined,
+            eventDate: formatDate(event.dateTime),
+            eventLocation: event.location || undefined,
+            inviteUrl: `${process.env.APP_URL || 'http://localhost:5000'}/invite/${invitation.token}`,
+            hostEmail: host.email,
+            guestName: member.name,
+            hostName: host.name || host.email,
+            token: invitation.token,
+            baseUrl: process.env.APP_URL || 'http://localhost:5000'
+          });
+        } catch (emailError) {
+          console.error('Failed to send invitation email:', emailError);
+        }
+      }
+
+      res.json({
+        success: true,
+        invitationCount: invitations.length,
+        invitations
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
