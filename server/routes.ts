@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
-import { insertUserSchema, insertEventSchema, updateHostProfileSchema, insertEventGroupSchema, insertGuestListSchema, insertGuestListMemberSchema, insertEventGroupGuestListSchema } from "@shared/schema";
+import { insertUserSchema, insertEventSchema, updateHostProfileSchema, insertEventGroupSchema, insertGuestListSchema, insertGuestListMemberSchema, insertEventGroupGuestListSchema, insertEventCollaboratorSchema, updateEventCollaboratorSchema, insertAnnouncementSchema, insertPollSchema, insertPollVoteSchema } from "@shared/schema";
 import { sendInvitationEmail, sendCancellationEmail } from "./email";
 import { ObjectStorageService } from "./objectStorage";
 
@@ -816,6 +816,364 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedHost);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Event Collaborator routes
+  app.get("/api/events/:id/collaborators", requireAuth, async (req: any, res) => {
+    try {
+      const event = await storage.getEventById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const collaborators = await storage.getEventCollaborators(req.params.id);
+      res.json(collaborators);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/events/:id/collaborators", requireAuth, async (req: any, res) => {
+    try {
+      const event = await storage.getEventById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { userId, role, permissions } = insertEventCollaboratorSchema.omit({ eventId: true }).parse(req.body);
+      
+      // Check if user exists
+      const collaboratorUser = await storage.getUserById(userId);
+      if (!collaboratorUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const collaborator = await storage.createEventCollaborator(req.params.id, userId, req.user.id, {
+        role,
+        permissions,
+      });
+
+      res.json(collaborator);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/events/:eventId/collaborators/:id", requireAuth, async (req: any, res) => {
+    try {
+      const event = await storage.getEventById(req.params.eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const updateData = updateEventCollaboratorSchema.parse(req.body);
+      const updatedCollaborator = await storage.updateEventCollaborator(req.params.id, updateData);
+      
+      res.json(updatedCollaborator);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/events/:eventId/collaborators/:id", requireAuth, async (req: any, res) => {
+    try {
+      const event = await storage.getEventById(req.params.eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || event.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deleteEventCollaborator(req.params.id);
+      res.json({ success: true, message: "Collaborator removed successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // User's collaborated events
+  app.get("/api/collaborated-events", requireAuth, async (req: any, res) => {
+    try {
+      const collaborations = await storage.getUserCollaboratedEvents(req.user.id);
+      res.json(collaborations);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Announcement routes
+  app.get("/api/announcements", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const announcements = await storage.getAnnouncementsByHostId(host.id);
+      res.json(announcements);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/announcements", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const announcementData = insertAnnouncementSchema.parse(req.body);
+      const announcement = await storage.createAnnouncement(host.id, announcementData);
+      
+      res.json(announcement);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/announcements/:id", requireAuth, async (req: any, res) => {
+    try {
+      const announcement = await storage.getAnnouncementById(req.params.id);
+      if (!announcement) {
+        return res.status(404).json({ error: "Announcement not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || announcement.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const updateData = req.body;
+      const updatedAnnouncement = await storage.updateAnnouncement(req.params.id, updateData);
+      
+      res.json(updatedAnnouncement);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/announcements/:id/publish", requireAuth, async (req: any, res) => {
+    try {
+      const announcement = await storage.getAnnouncementById(req.params.id);
+      if (!announcement) {
+        return res.status(404).json({ error: "Announcement not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || announcement.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const publishedAnnouncement = await storage.publishAnnouncement(req.params.id);
+      res.json(publishedAnnouncement);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/announcements/:id", requireAuth, async (req: any, res) => {
+    try {
+      const announcement = await storage.getAnnouncementById(req.params.id);
+      if (!announcement) {
+        return res.status(404).json({ error: "Announcement not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || announcement.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deleteAnnouncement(req.params.id);
+      res.json({ success: true, message: "Announcement deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Poll routes
+  app.get("/api/polls", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const polls = await storage.getPollsByHostId(host.id);
+      res.json(polls);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/polls", requireAuth, async (req: any, res) => {
+    try {
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host) {
+        return res.status(404).json({ error: "Host profile not found" });
+      }
+
+      const pollData = insertPollSchema.parse(req.body);
+      const poll = await storage.createPoll(host.id, pollData);
+      
+      res.json(poll);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/polls/:id", async (req, res) => {
+    try {
+      const poll = await storage.getPollById(req.params.id);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+
+      const votes = await storage.getPollVotes(req.params.id);
+      
+      // Count votes for each option
+      const voteCounts = poll.options.map((_, index) => {
+        return votes.filter(vote => vote.selectedOptions.includes(index.toString())).length;
+      });
+
+      res.json({ ...poll, voteCounts, totalVotes: votes.length });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/polls/:id/vote", async (req, res) => {
+    try {
+      const poll = await storage.getPollById(req.params.id);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+
+      if (poll.status !== 'active') {
+        return res.status(400).json({ error: "Poll is not active" });
+      }
+
+      if (new Date() > poll.endDate) {
+        return res.status(400).json({ error: "Poll has ended" });
+      }
+
+      const voteData = insertPollVoteSchema.parse(req.body);
+      
+      // Check if user has already voted
+      const existingVote = await storage.getUserPollVote(
+        req.params.id, 
+        voteData.userId || undefined, 
+        voteData.voterEmail || undefined
+      );
+
+      if (existingVote) {
+        // Update existing vote
+        const updatedVote = await storage.updatePollVote(existingVote.id, voteData.selectedOptions);
+        res.json(updatedVote);
+      } else {
+        // Create new vote
+        const vote = await storage.createPollVote({
+          ...voteData,
+          pollId: req.params.id,
+        });
+        res.json(vote);
+      }
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/polls/:id/end", requireAuth, async (req: any, res) => {
+    try {
+      const poll = await storage.getPollById(req.params.id);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || poll.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const endedPoll = await storage.endPoll(req.params.id);
+      res.json(endedPoll);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/polls/:id/convert-to-event", requireAuth, async (req: any, res) => {
+    try {
+      const poll = await storage.getPollById(req.params.id);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || poll.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { eventData } = req.body;
+      
+      // Create event from poll data
+      const event = await storage.createEvent(
+        host.id,
+        eventData.title || poll.title,
+        eventData.description || poll.description,
+        new Date(eventData.startDateTime),
+        eventData.endDateTime ? new Date(eventData.endDateTime) : null,
+        eventData.location || null,
+        eventData.exactAddress || null,
+        eventData.customDirections || null,
+        eventData.isAllDay || false,
+        eventData.groupId || null
+      );
+
+      // Mark poll as converted
+      const convertedPoll = await storage.convertPollToEvent(req.params.id, event.id);
+      
+      res.json({ poll: convertedPoll, event });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/polls/:id", requireAuth, async (req: any, res) => {
+    try {
+      const poll = await storage.getPollById(req.params.id);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || poll.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deletePoll(req.params.id);
+      res.json({ success: true, message: "Poll deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 

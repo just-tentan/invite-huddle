@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { EventChat } from '@/components/EventChat';
+import { CollaboratorManager } from '@/components/CollaboratorManager';
 
 interface Event {
   id: string;
@@ -702,6 +703,8 @@ const EventManage = () => {
 
           {/* Invitations List */}
           <div className="space-y-6">
+            {/* Event Collaborators */}
+            <CollaboratorManager eventId={event.id} />
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-start">

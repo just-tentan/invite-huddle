@@ -10,6 +10,8 @@ import { CreateEventDialog } from '@/components/CreateEventDialog';
 import { HostProfileDialog } from '@/components/HostProfileDialog';
 import { GuestListsDialog } from '@/components/GuestListsDialog';
 import { EventGroupsDialog } from '@/components/EventGroupsDialog';
+import { AnnouncementManager } from '@/components/AnnouncementManager';
+import { PollManager } from '@/components/PollManager';
 import type { Host } from '@shared/schema';
 
 interface Event {
@@ -384,6 +386,12 @@ const Dashboard = () => {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Management Features Section */}
+      <div className="container mx-auto px-4 pb-8 space-y-8">
+        <AnnouncementManager />
+        <PollManager />
       </div>
 
       <CreateEventDialog

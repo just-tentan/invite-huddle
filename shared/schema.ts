@@ -115,6 +115,59 @@ export const eventMessages = pgTable("event_messages", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Event collaborators table for co-hosts/organizers
+export const eventCollaborators = pgTable("event_collaborators", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: uuid("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: text("role", { enum: ["co-host", "organizer", "collaborator"] }).notNull().default("collaborator"),
+  permissions: text("permissions").array().notNull().default(sql`'{}'::text[]`), // ["manage_guests", "manage_groups", "manage_event"]
+  invitedBy: uuid("invited_by").notNull().references(() => users.id),
+  status: text("status", { enum: ["pending", "accepted", "declined"] }).default("pending"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Announcements table
+export const announcements = pgTable("announcements", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  hostId: uuid("host_id").notNull().references(() => hosts.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  targetAudience: text("target_audience", { enum: ["all_users", "event_attendees", "specific_users"] }).notNull().default("all_users"),
+  eventId: uuid("event_id").references(() => events.id, { onDelete: "cascade" }), // Optional - for event-specific announcements
+  isPublished: boolean("is_published").default(false),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Polls table
+export const polls = pgTable("polls", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  hostId: uuid("host_id").notNull().references(() => hosts.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  options: text("options").array().notNull(), // Array of poll options
+  allowMultipleChoices: boolean("allow_multiple_choices").default(false),
+  endDate: timestamp("end_date").notNull(),
+  status: text("status", { enum: ["active", "ended", "converted"] }).default("active"),
+  convertedEventId: uuid("converted_event_id").references(() => events.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Poll votes table
+export const pollVotes = pgTable("poll_votes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  pollId: uuid("poll_id").notNull().references(() => polls.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  voterEmail: text("voter_email"), // For non-registered users
+  voterName: text("voter_name"), // For non-registered users
+  selectedOptions: text("selected_options").array().notNull(), // Array of selected option indices
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Schema validation
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
@@ -183,6 +236,43 @@ export const insertEventMessageSchema = createInsertSchema(eventMessages).pick({
   message: true,
 });
 
+export const insertEventCollaboratorSchema = createInsertSchema(eventCollaborators).pick({
+  eventId: true,
+  userId: true,
+  role: true,
+  permissions: true,
+});
+
+export const updateEventCollaboratorSchema = createInsertSchema(eventCollaborators).pick({
+  role: true,
+  permissions: true,
+  status: true,
+});
+
+export const insertAnnouncementSchema = createInsertSchema(announcements).pick({
+  title: true,
+  content: true,
+  targetAudience: true,
+  eventId: true,
+});
+
+export const insertPollSchema = createInsertSchema(polls).pick({
+  title: true,
+  description: true,
+  options: true,
+  allowMultipleChoices: true,
+}).extend({
+  endDate: z.string().transform((str) => new Date(str)),
+});
+
+export const insertPollVoteSchema = createInsertSchema(pollVotes).pick({
+  pollId: true,
+  userId: true,
+  voterEmail: true,
+  voterName: true,
+  selectedOptions: true,
+});
+
 export const updateHostProfileSchema = createInsertSchema(hosts).pick({
   firstName: true,
   lastName: true,
@@ -205,6 +295,11 @@ export type InsertEventGroupGuestList = z.infer<typeof insertEventGroupGuestList
 export type InsertGuestList = z.infer<typeof insertGuestListSchema>;
 export type InsertGuestListMember = z.infer<typeof insertGuestListMemberSchema>;
 export type UpdateHostProfile = z.infer<typeof updateHostProfileSchema>;
+export type InsertEventCollaborator = z.infer<typeof insertEventCollaboratorSchema>;
+export type UpdateEventCollaborator = z.infer<typeof updateEventCollaboratorSchema>;
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+export type InsertPoll = z.infer<typeof insertPollSchema>;
+export type InsertPollVote = z.infer<typeof insertPollVoteSchema>;
 
 export type User = typeof users.$inferSelect;
 export type Host = typeof hosts.$inferSelect;
@@ -215,3 +310,7 @@ export type GuestList = typeof guestLists.$inferSelect;
 export type GuestListMember = typeof guestListMembers.$inferSelect;
 export type Invitation = typeof invitations.$inferSelect;
 export type EventMessage = typeof eventMessages.$inferSelect;
+export type EventCollaborator = typeof eventCollaborators.$inferSelect;
+export type Announcement = typeof announcements.$inferSelect;
+export type Poll = typeof polls.$inferSelect;
+export type PollVote = typeof pollVotes.$inferSelect;

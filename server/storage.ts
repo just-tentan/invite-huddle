@@ -2,9 +2,12 @@ import { eq, and } from "drizzle-orm";
 import { db } from "./db";
 import { 
   users, hosts, events, invitations, eventMessages, eventGroups, guestLists, guestListMembers, eventGroupGuestLists,
+  eventCollaborators, announcements, polls, pollVotes,
   type User, type InsertUser, type Host, type Event, type Invitation, type EventMessage, 
   type EventGroup, type GuestList, type GuestListMember, type UpdateHostProfile, 
-  type InsertEventGroup, type InsertGuestList, type InsertGuestListMember, type EventGroupGuestList, type InsertEventGroupGuestList
+  type InsertEventGroup, type InsertGuestList, type InsertGuestListMember, type EventGroupGuestList, type InsertEventGroupGuestList,
+  type EventCollaborator, type InsertEventCollaborator, type UpdateEventCollaborator,
+  type Announcement, type InsertAnnouncement, type Poll, type InsertPoll, type PollVote, type InsertPollVote
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -65,6 +68,38 @@ export interface IStorage {
   createGuestListMember(data: InsertGuestListMember): Promise<GuestListMember>;
   updateGuestListMember(id: string, data: Partial<GuestListMember>): Promise<GuestListMember>;
   deleteGuestListMember(id: string): Promise<void>;
+  
+  // Event Collaborator methods
+  getEventCollaborators(eventId: string): Promise<EventCollaborator[]>;
+  getEventCollaboratorById(id: string): Promise<EventCollaborator | undefined>;
+  createEventCollaborator(eventId: string, userId: string, invitedBy: string, data: Omit<InsertEventCollaborator, 'eventId' | 'userId'>): Promise<EventCollaborator>;
+  updateEventCollaborator(id: string, data: UpdateEventCollaborator): Promise<EventCollaborator>;
+  deleteEventCollaborator(id: string): Promise<void>;
+  getUserCollaboratedEvents(userId: string): Promise<EventCollaborator[]>;
+  
+  // Announcement methods
+  getAnnouncementsByHostId(hostId: string): Promise<Announcement[]>;
+  getAnnouncementById(id: string): Promise<Announcement | undefined>;
+  createAnnouncement(hostId: string, data: InsertAnnouncement): Promise<Announcement>;
+  updateAnnouncement(id: string, data: Partial<Announcement>): Promise<Announcement>;
+  deleteAnnouncement(id: string): Promise<void>;
+  publishAnnouncement(id: string): Promise<Announcement>;
+  
+  // Poll methods
+  getPollsByHostId(hostId: string): Promise<Poll[]>;
+  getActivePollsByHostId(hostId: string): Promise<Poll[]>;
+  getPollById(id: string): Promise<Poll | undefined>;
+  createPoll(hostId: string, data: InsertPoll): Promise<Poll>;
+  updatePoll(id: string, data: Partial<Poll>): Promise<Poll>;
+  deletePoll(id: string): Promise<void>;
+  endPoll(id: string): Promise<Poll>;
+  convertPollToEvent(pollId: string, eventId: string): Promise<Poll>;
+  
+  // Poll Vote methods
+  getPollVotes(pollId: string): Promise<PollVote[]>;
+  createPollVote(data: InsertPollVote): Promise<PollVote>;
+  getUserPollVote(pollId: string, userId?: string, voterEmail?: string): Promise<PollVote | undefined>;
+  updatePollVote(id: string, selectedOptions: string[]): Promise<PollVote>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -329,6 +364,186 @@ export class DatabaseStorage implements IStorage {
           eq(eventGroupGuestLists.guestListId, guestListId)
         )
       );
+  }
+  
+  // Event Collaborator methods
+  async getEventCollaborators(eventId: string): Promise<EventCollaborator[]> {
+    return db.select().from(eventCollaborators).where(eq(eventCollaborators.eventId, eventId)).orderBy(eventCollaborators.createdAt);
+  }
+  
+  async getEventCollaboratorById(id: string): Promise<EventCollaborator | undefined> {
+    const result = await db.select().from(eventCollaborators).where(eq(eventCollaborators.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async createEventCollaborator(eventId: string, userId: string, invitedBy: string, data: Omit<InsertEventCollaborator, 'eventId' | 'userId'>): Promise<EventCollaborator> {
+    const result = await db.insert(eventCollaborators).values({
+      eventId,
+      userId,
+      invitedBy,
+      ...data,
+    }).returning();
+    return result[0];
+  }
+  
+  async updateEventCollaborator(id: string, data: UpdateEventCollaborator): Promise<EventCollaborator> {
+    const result = await db.update(eventCollaborators)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(eventCollaborators.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async deleteEventCollaborator(id: string): Promise<void> {
+    await db.delete(eventCollaborators).where(eq(eventCollaborators.id, id));
+  }
+  
+  async getUserCollaboratedEvents(userId: string): Promise<EventCollaborator[]> {
+    return db.select().from(eventCollaborators)
+      .where(and(eq(eventCollaborators.userId, userId), eq(eventCollaborators.status, 'accepted')))
+      .orderBy(eventCollaborators.createdAt);
+  }
+  
+  // Announcement methods
+  async getAnnouncementsByHostId(hostId: string): Promise<Announcement[]> {
+    return db.select().from(announcements).where(eq(announcements.hostId, hostId)).orderBy(announcements.createdAt);
+  }
+  
+  async getAnnouncementById(id: string): Promise<Announcement | undefined> {
+    const result = await db.select().from(announcements).where(eq(announcements.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async createAnnouncement(hostId: string, data: InsertAnnouncement): Promise<Announcement> {
+    const result = await db.insert(announcements).values({
+      hostId,
+      ...data,
+    }).returning();
+    return result[0];
+  }
+  
+  async updateAnnouncement(id: string, data: Partial<Announcement>): Promise<Announcement> {
+    const result = await db.update(announcements)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(announcements.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async deleteAnnouncement(id: string): Promise<void> {
+    await db.delete(announcements).where(eq(announcements.id, id));
+  }
+  
+  async publishAnnouncement(id: string): Promise<Announcement> {
+    const result = await db.update(announcements)
+      .set({
+        isPublished: true,
+        publishedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(announcements.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  // Poll methods
+  async getPollsByHostId(hostId: string): Promise<Poll[]> {
+    return db.select().from(polls).where(eq(polls.hostId, hostId)).orderBy(polls.createdAt);
+  }
+  
+  async getActivePollsByHostId(hostId: string): Promise<Poll[]> {
+    return db.select().from(polls)
+      .where(and(eq(polls.hostId, hostId), eq(polls.status, 'active')))
+      .orderBy(polls.createdAt);
+  }
+  
+  async getPollById(id: string): Promise<Poll | undefined> {
+    const result = await db.select().from(polls).where(eq(polls.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async createPoll(hostId: string, data: InsertPoll): Promise<Poll> {
+    const result = await db.insert(polls).values({
+      hostId,
+      ...data,
+    }).returning();
+    return result[0];
+  }
+  
+  async updatePoll(id: string, data: Partial<Poll>): Promise<Poll> {
+    const result = await db.update(polls)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(polls.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async deletePoll(id: string): Promise<void> {
+    await db.delete(polls).where(eq(polls.id, id));
+  }
+  
+  async endPoll(id: string): Promise<Poll> {
+    const result = await db.update(polls)
+      .set({
+        status: 'ended',
+        updatedAt: new Date(),
+      })
+      .where(eq(polls.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async convertPollToEvent(pollId: string, eventId: string): Promise<Poll> {
+    const result = await db.update(polls)
+      .set({
+        status: 'converted',
+        convertedEventId: eventId,
+        updatedAt: new Date(),
+      })
+      .where(eq(polls.id, pollId))
+      .returning();
+    return result[0];
+  }
+  
+  // Poll Vote methods
+  async getPollVotes(pollId: string): Promise<PollVote[]> {
+    return db.select().from(pollVotes).where(eq(pollVotes.pollId, pollId)).orderBy(pollVotes.createdAt);
+  }
+  
+  async createPollVote(data: InsertPollVote): Promise<PollVote> {
+    const result = await db.insert(pollVotes).values(data).returning();
+    return result[0];
+  }
+  
+  async getUserPollVote(pollId: string, userId?: string, voterEmail?: string): Promise<PollVote | undefined> {
+    let condition;
+    if (userId) {
+      condition = and(eq(pollVotes.pollId, pollId), eq(pollVotes.userId, userId));
+    } else if (voterEmail) {
+      condition = and(eq(pollVotes.pollId, pollId), eq(pollVotes.voterEmail, voterEmail));
+    } else {
+      return undefined;
+    }
+    
+    const result = await db.select().from(pollVotes).where(condition).limit(1);
+    return result[0];
+  }
+  
+  async updatePollVote(id: string, selectedOptions: string[]): Promise<PollVote> {
+    const result = await db.update(pollVotes)
+      .set({ selectedOptions })
+      .where(eq(pollVotes.id, id))
+      .returning();
+    return result[0];
   }
 }
 
