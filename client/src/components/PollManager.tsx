@@ -234,12 +234,18 @@ export function PollManager() {
 
   const openEditDialog = (poll: Poll) => {
     setSelectedPoll(poll);
+    // Format the date for datetime-local input (YYYY-MM-DDTHH:MM)
+    const formatDateForInput = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.toISOString().slice(0, 16);
+    };
+    
     setEditForm({
       title: poll.title,
       description: poll.description || '',
       options: [...poll.options],
       allowMultipleChoices: poll.allowMultipleChoices,
-      endDate: poll.endDate,
+      endDate: formatDateForInput(poll.endDate),
       notifyGuestLists: [],
       sendNotifications: false,
     });

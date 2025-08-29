@@ -1177,6 +1177,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { sendEmail, notifyGuestListIds, ...updateData } = req.body;
+      
+      // Convert endDate string to Date object if it exists
+      if (updateData.endDate && typeof updateData.endDate === 'string') {
+        updateData.endDate = new Date(updateData.endDate);
+      }
+      
       const updatedPoll = await storage.updatePoll(req.params.id, updateData);
       
       // Send emails if requested

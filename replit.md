@@ -36,6 +36,8 @@ Preferred communication style: Simple, everyday language.
   - Invitations table with unique tokens for secure access
   - Event messages table for chat functionality
 - **Migrations**: Drizzle Kit for schema migrations and database management
+  - Polls table with voting system, email notifications, and edit capabilities
+  - Poll votes table for tracking user participation
 
 ### Authentication & Authorization
 - **Session-based Authentication**: Express sessions with configurable storage
