@@ -1089,7 +1089,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             endDate: poll.endDate,
             hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
             pollId: poll.id,
-            baseUrl: process.env.REPL_URL || `https://${process.env.REPL_SLUG}-${process.env.REPL_OWNER}.replit.app` || `http://localhost:${process.env.PORT || 5000}`,
+            baseUrl: process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `https://${req.get('host') || 'localhost:5000'}`,
           });
         }
       }
@@ -1178,18 +1178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { sendEmail, notifyGuestListIds, ...updateData } = req.body;
       
-      console.log('Poll update request body:', JSON.stringify(req.body, null, 2));
-      console.log('Update data after destructuring:', JSON.stringify(updateData, null, 2));
-      
       // Validate and transform the update data
-      try {
-        const validatedData = updatePollSchema.parse(updateData);
-        console.log('Validated data:', JSON.stringify(validatedData, null, 2));
-      } catch (validationError) {
-        console.error('Validation error details:', validationError);
-        throw validationError;
-      }
-      
       const validatedData = updatePollSchema.parse(updateData);
       
       const updatedPoll = await storage.updatePoll(req.params.id, validatedData);
@@ -1214,7 +1203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             endDate: updatedPoll.endDate instanceof Date ? updatedPoll.endDate : new Date(updatedPoll.endDate),
             hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
             pollId: updatedPoll.id,
-            baseUrl: process.env.REPL_URL || `https://${process.env.REPL_SLUG}-${process.env.REPL_OWNER}.replit.app` || `http://localhost:${process.env.PORT || 5000}`,
+            baseUrl: process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `https://${req.get('host') || 'localhost:5000'}`,
           });
         }
       }
