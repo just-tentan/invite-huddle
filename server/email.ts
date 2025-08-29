@@ -262,6 +262,8 @@ export async function sendPollEmail({
   baseUrl
 }: PollEmailParams): Promise<boolean> {
   try {
+    console.log('Poll email baseUrl:', baseUrl);
+    
     const formattedDate = endDate.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
