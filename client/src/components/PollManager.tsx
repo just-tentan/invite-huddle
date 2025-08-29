@@ -7,6 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Check, ChevronsUpDown, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/components/ui/use-toast';
@@ -150,7 +154,8 @@ export function PollManager() {
           options: validOptions,
           allowMultipleChoices: createForm.allowMultipleChoices,
           endDate: createForm.endDate,
-          notifyGuestLists: createForm.sendNotifications ? createForm.notifyGuestLists : [],
+          sendEmail: createForm.sendNotifications,
+          notifyGuestListIds: createForm.sendNotifications ? createForm.notifyGuestLists : [],
         }),
       });
 
@@ -562,43 +567,94 @@ export function PollManager() {
                 {createForm.sendNotifications && (
                   <div>
                     <Label>Notify Guest Lists</Label>
-                    <div className="space-y-2 mt-2 max-h-40 overflow-y-auto">
-                      {guestLists.map((guestList) => (
-                        <div key={guestList.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`guestlist-${guestList.id}`}
-                            checked={createForm.notifyGuestLists.includes(guestList.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setCreateForm({
-                                  ...createForm,
-                                  notifyGuestLists: [...createForm.notifyGuestLists, guestList.id]
-                                });
-                              } else {
-                                setCreateForm({
-                                  ...createForm,
-                                  notifyGuestLists: createForm.notifyGuestLists.filter(id => id !== guestList.id)
-                                });
-                              }
-                            }}
-                            data-testid={`checkbox-guestlist-${guestList.id}`}
-                          />
-                          <Label htmlFor={`guestlist-${guestList.id}`}>
-                            {guestList.name}
-                            {guestList.description && (
-                              <span className="text-sm text-muted-foreground block">
-                                {guestList.description}
-                              </span>
-                            )}
-                          </Label>
-                        </div>
-                      ))}
-                      {guestLists.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          No guest lists available. Create guest lists first to notify users about polls.
-                        </p>
-                      )}
-                    </div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between mt-2"
+                          data-testid="button-select-guest-lists"
+                        >
+                          {createForm.notifyGuestLists.length > 0
+                            ? `${createForm.notifyGuestLists.length} guest list${createForm.notifyGuestLists.length !== 1 ? 's' : ''} selected`
+                            : "Select guest lists..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput placeholder="Search guest lists..." />
+                          <CommandList>
+                            <CommandEmpty>No guest lists found.</CommandEmpty>
+                            <CommandGroup>
+                              {guestLists.map((guestList) => (
+                                <CommandItem
+                                  key={guestList.id}
+                                  value={guestList.name}
+                                  onSelect={() => {
+                                    const isSelected = createForm.notifyGuestLists.includes(guestList.id);
+                                    if (isSelected) {
+                                      setCreateForm({
+                                        ...createForm,
+                                        notifyGuestLists: createForm.notifyGuestLists.filter(id => id !== guestList.id)
+                                      });
+                                    } else {
+                                      setCreateForm({
+                                        ...createForm,
+                                        notifyGuestLists: [...createForm.notifyGuestLists, guestList.id]
+                                      });
+                                    }
+                                  }}
+                                  data-testid={`command-item-${guestList.id}`}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      createForm.notifyGuestLists.includes(guestList.id)
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span>{guestList.name}</span>
+                                    {guestList.description && (
+                                      <span className="text-xs text-muted-foreground">
+                                        {guestList.description}
+                                      </span>
+                                    )}
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    {createForm.notifyGuestLists.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {createForm.notifyGuestLists.map(listId => {
+                          const guestList = guestLists.find(list => list.id === listId);
+                          return guestList ? (
+                            <div key={listId} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
+                              <span>{guestList.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCreateForm({
+                                    ...createForm,
+                                    notifyGuestLists: createForm.notifyGuestLists.filter(id => id !== listId)
+                                  });
+                                }}
+                                className="hover:bg-secondary-foreground/10 rounded-full p-0.5"
+                                data-testid={`remove-guestlist-${listId}`}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

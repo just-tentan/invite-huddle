@@ -29,9 +29,22 @@ interface Event {
   endDateTime?: string;
 }
 
+interface User {
+  id: string;
+  email: string;
+}
+
+interface GuestListMember {
+  id: string;
+  name: string;
+  email: string;
+  guestListId: string;
+}
+
 export function AnnouncementManager() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [users, setUsers] = useState<GuestListMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -41,22 +54,26 @@ export function AnnouncementManager() {
     content: '',
     targetAudience: 'all_users' as "all_users" | "event_attendees" | "specific_users",
     eventId: '',
+    specificUserEmails: [] as string[],
   });
   const [editForm, setEditForm] = useState<{
     title: string;
     content: string;
     targetAudience: "all_users" | "event_attendees" | "specific_users";
     eventId: string;
+    specificUserEmails: string[];
   }>({
     title: '',
     content: '',
     targetAudience: 'all_users',
     eventId: '',
+    specificUserEmails: [],
   });
 
   useEffect(() => {
     fetchAnnouncements();
     fetchEvents();
+    fetchUsers();
   }, []);
 
   const fetchAnnouncements = async () => {
@@ -95,6 +112,42 @@ export function AnnouncementManager() {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/guest-lists', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const guestLists = await response.json();
+        const allUsers: GuestListMember[] = [];
+        
+        // Fetch members for each guest list
+        for (const list of guestLists) {
+          try {
+            const membersResponse = await fetch(`/api/guest-lists/${list.id}/members`, {
+              credentials: 'include',
+            });
+            if (membersResponse.ok) {
+              const members = await membersResponse.json();
+              allUsers.push(...members);
+            }
+          } catch (error) {
+            console.error('Error fetching guest list members:', error);
+          }
+        }
+        
+        // Remove duplicates based on email
+        const uniqueUsers = allUsers.filter((user, index, self) => 
+          index === self.findIndex(u => u.email === user.email)
+        );
+        setUsers(uniqueUsers);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
+
   const handleCreateAnnouncement = async () => {
     if (!createForm.title.trim() || !createForm.content.trim()) {
       toast({
@@ -115,13 +168,14 @@ export function AnnouncementManager() {
           content: createForm.content,
           targetAudience: createForm.targetAudience,
           eventId: createForm.eventId || undefined,
+          specificUserEmails: createForm.specificUserEmails.length > 0 ? createForm.specificUserEmails : undefined,
           sendEmail: true, // Send emails when creating announcement
         }),
       });
 
       if (response.ok) {
         await fetchAnnouncements();
-        setCreateForm({ title: '', content: '', targetAudience: 'all_users', eventId: '' });
+        setCreateForm({ title: '', content: '', targetAudience: 'all_users', eventId: '', specificUserEmails: [] });
         setIsCreateDialogOpen(false);
         toast({
           title: "Announcement Created",
@@ -259,6 +313,7 @@ export function AnnouncementManager() {
       content: announcement.content,
       targetAudience: announcement.targetAudience,
       eventId: announcement.eventId || '',
+      specificUserEmails: [],
     });
     setIsEditDialogOpen(true);
   };
@@ -392,6 +447,50 @@ export function AnnouncementManager() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                )}
+                {createForm.targetAudience === 'specific_users' && (
+                  <div>
+                    <Label>Select Specific Users</Label>
+                    <div className="space-y-2 mt-2 max-h-48 overflow-y-auto border rounded p-3">
+                      {users.map((user) => (
+                        <div key={user.email} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`user-${user.email}`}
+                            checked={createForm.specificUserEmails.includes(user.email)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setCreateForm({
+                                  ...createForm,
+                                  specificUserEmails: [...createForm.specificUserEmails, user.email]
+                                });
+                              } else {
+                                setCreateForm({
+                                  ...createForm,
+                                  specificUserEmails: createForm.specificUserEmails.filter(email => email !== user.email)
+                                });
+                              }
+                            }}
+                            className="rounded border-gray-300"
+                            data-testid={`checkbox-user-${user.email}`}
+                          />
+                          <Label htmlFor={`user-${user.email}`} className="text-sm">
+                            {user.name} ({user.email})
+                          </Label>
+                        </div>
+                      ))}
+                      {users.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          No users available. Add members to your guest lists first.
+                        </p>
+                      )}
+                    </div>
+                    {createForm.specificUserEmails.length > 0 && (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Selected: {createForm.specificUserEmails.length} user{createForm.specificUserEmails.length !== 1 ? 's' : ''}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -538,16 +637,76 @@ export function AnnouncementManager() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="edit-eventId">Related Event ID (optional)</Label>
-                <Input
-                  id="edit-eventId"
-                  value={editForm.eventId}
-                  onChange={(e) => setEditForm({ ...editForm, eventId: e.target.value })}
-                  placeholder="Enter event ID (optional)"
-                  data-testid="input-edit-announcement-event-id"
-                />
-              </div>
+              {(editForm.targetAudience === 'event_attendees') && (
+                <div>
+                  <Label htmlFor="edit-eventId">Select Event</Label>
+                  <Select
+                    value={editForm.eventId}
+                    onValueChange={(value) => setEditForm({ ...editForm, eventId: value })}
+                  >
+                    <SelectTrigger data-testid="select-edit-announcement-event">
+                      <SelectValue placeholder="Select an event" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {events.map((event) => (
+                        <SelectItem key={event.id} value={event.id}>
+                          {event.title} - {new Date(event.startDateTime).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {editForm.targetAudience === 'specific_users' && (
+                <div>
+                  <Label>Select Specific Users</Label>
+                  <div className="space-y-2 mt-2 max-h-48 overflow-y-auto border rounded p-3">
+                    {users.map((user) => (
+                      <div key={user.email} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`edit-user-${user.email}`}
+                          checked={editForm.specificUserEmails.includes(user.email)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditForm({
+                                ...editForm,
+                                specificUserEmails: [...editForm.specificUserEmails, user.email]
+                              });
+                            } else {
+                              setEditForm({
+                                ...editForm,
+                                specificUserEmails: editForm.specificUserEmails.filter(email => email !== user.email)
+                              });
+                            }
+                          }}
+                          className="rounded border-gray-300"
+                          data-testid={`checkbox-edit-user-${user.email}`}
+                        />
+                        <Label htmlFor={`edit-user-${user.email}`} className="text-sm">
+                          {user.name} ({user.email})
+                        </Label>
+                      </div>
+                    ))}
+                    {users.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No users available. Add members to your guest lists first.
+                      </p>
+                    )}
+                  </div>
+                  {editForm.specificUserEmails.length > 0 && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Selected: {editForm.specificUserEmails.length} user{editForm.specificUserEmails.length !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>

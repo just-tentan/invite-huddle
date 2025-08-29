@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
 import { insertUserSchema, insertEventSchema, updateHostProfileSchema, insertEventGroupSchema, insertGuestListSchema, insertGuestListMemberSchema, insertEventGroupGuestListSchema, insertEventCollaboratorSchema, updateEventCollaboratorSchema, insertAnnouncementSchema, insertPollSchema, insertPollVoteSchema } from "@shared/schema";
-import { sendInvitationEmail, sendCancellationEmail } from "./email";
+import { sendInvitationEmail, sendCancellationEmail, sendAnnouncementEmail, sendPollEmail } from "./email";
 import { ObjectStorageService } from "./objectStorage";
 
 // Utility functions
@@ -942,8 +942,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Host profile not found" });
       }
 
-      const announcementData = insertAnnouncementSchema.parse(req.body);
-      const announcement = await storage.createAnnouncement(host.id, announcementData);
+      const { sendEmail, specificUserEmails, ...announcementData } = req.body;
+      const announcement = await storage.createAnnouncement(host.id, insertAnnouncementSchema.parse(announcementData));
+      
+      // Send emails if requested
+      if (sendEmail) {
+        let emailRecipients: string[] = [];
+        
+        if (announcementData.targetAudience === 'all_users') {
+          // Get all users from guest lists
+          const guestLists = await storage.getGuestListsByHostId(host.id);
+          for (const list of guestLists) {
+            const members = await storage.getGuestListMembers(list.id);
+            emailRecipients.push(...members.map(m => m.email));
+          }
+        } else if (announcementData.targetAudience === 'event_attendees' && announcementData.eventId) {
+          // Get event attendees
+          const invitations = await storage.getInvitationsByEventId(announcementData.eventId);
+          emailRecipients = invitations
+            .filter(inv => inv.rsvpStatus === 'yes')
+            .map(inv => inv.email);
+        } else if (announcementData.targetAudience === 'specific_users' && specificUserEmails) {
+          emailRecipients = specificUserEmails;
+        }
+        
+        // Remove duplicates and send emails
+        const uniqueRecipients = [...new Set(emailRecipients)];
+        if (uniqueRecipients.length > 0) {
+          await sendAnnouncementEmail({
+            to: uniqueRecipients,
+            title: announcement.title,
+            content: announcement.content,
+            hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
+          });
+        }
+      }
       
       res.json(announcement);
     } catch (error: any) {
@@ -1032,8 +1065,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Host profile not found" });
       }
 
-      const pollData = insertPollSchema.parse(req.body);
-      const poll = await storage.createPoll(host.id, pollData);
+      const { sendEmail, notifyGuestListIds, ...pollData } = req.body;
+      const poll = await storage.createPoll(host.id, insertPollSchema.parse(pollData));
+      
+      // Send emails if requested
+      if (sendEmail && notifyGuestListIds && notifyGuestListIds.length > 0) {
+        let emailRecipients: string[] = [];
+        
+        for (const guestListId of notifyGuestListIds) {
+          const members = await storage.getGuestListMembers(guestListId);
+          emailRecipients.push(...members.map(m => m.email));
+        }
+        
+        // Remove duplicates and send emails
+        const uniqueRecipients = [...new Set(emailRecipients)];
+        if (uniqueRecipients.length > 0) {
+          await sendPollEmail({
+            to: uniqueRecipients,
+            title: poll.title,
+            description: poll.description,
+            options: poll.options,
+            endDate: poll.endDate,
+            hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
+          });
+        }
+      }
       
       res.json(poll);
     } catch (error: any) {

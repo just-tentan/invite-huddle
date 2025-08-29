@@ -29,6 +29,22 @@ interface CancellationEmailParams {
   guestName?: string;
 }
 
+interface AnnouncementEmailParams {
+  to: string | string[];
+  title: string;
+  content: string;
+  hostName?: string;
+}
+
+interface PollEmailParams {
+  to: string | string[];
+  title: string;
+  description?: string;
+  options: string[];
+  endDate: Date;
+  hostName?: string;
+}
+
 export async function sendCancellationEmail({
   to,
   eventTitle,
@@ -184,6 +200,120 @@ export async function sendInvitationEmail({
     return true;
   } catch (error) {
     console.error('Error sending invitation email:', error);
+    return false;
+  }
+}
+
+export async function sendAnnouncementEmail({
+  to,
+  title,
+  content,
+  hostName
+}: AnnouncementEmailParams): Promise<boolean> {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: `EventHost <onboarding@resend.dev>`,
+      to: Array.isArray(to) ? to : [to],
+      subject: `📢 New Announcement: ${title}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; font-size: 24px;">📢 New Announcement</h1>
+            ${hostName ? `<p style="margin: 10px 0 0 0;">From: ${hostName}</p>` : ''}
+          </div>
+          
+          <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
+            <div style="background: white; padding: 20px; border-radius: 6px; margin: 20px 0;">
+              <h2 style="color: #1e293b; margin: 0 0 15px 0;">${title}</h2>
+              <p style="color: #374151; line-height: 1.6; white-space: pre-line;">${content}</p>
+            </div>
+          </div>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280;">
+            <p style="text-align: center; margin: 0;">This announcement was sent from EventHost.</p>
+          </div>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('Resend announcement email error:', error);
+      return false;
+    }
+
+    console.log('Announcement email sent successfully:', data);
+    return true;
+  } catch (error) {
+    console.error('Error sending announcement email:', error);
+    return false;
+  }
+}
+
+export async function sendPollEmail({
+  to,
+  title,
+  description,
+  options,
+  endDate,
+  hostName
+}: PollEmailParams): Promise<boolean> {
+  try {
+    const formattedDate = endDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const { data, error } = await resend.emails.send({
+      from: `EventHost <onboarding@resend.dev>`,
+      to: Array.isArray(to) ? to : [to],
+      subject: `📊 New Poll: ${title}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: #059669; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; font-size: 24px;">📊 New Poll Available</h1>
+            ${hostName ? `<p style="margin: 10px 0 0 0;">From: ${hostName}</p>` : ''}
+          </div>
+          
+          <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
+            <div style="background: white; padding: 20px; border-radius: 6px; margin: 20px 0;">
+              <h2 style="color: #1e293b; margin: 0 0 15px 0;">${title}</h2>
+              ${description ? `<p style="color: #374151; line-height: 1.6; margin-bottom: 20px; white-space: pre-line;">${description}</p>` : ''}
+              
+              <h3 style="color: #059669; margin: 20px 0 15px 0;">Options:</h3>
+              <ul style="list-style: none; padding: 0;">
+                ${options.map(option => `<li style="background: #f3f4f6; margin: 8px 0; padding: 12px; border-radius: 4px; border-left: 4px solid #059669;">${option}</li>`).join('')}
+              </ul>
+              
+              <div style="background: #fef3c7; padding: 15px; border-radius: 6px; margin: 15px 0; text-align: center;">
+                <strong style="color: #92400e;">⏰ Poll ends: ${formattedDate}</strong>
+              </div>
+              
+              <p style="color: #374151; text-align: center; font-weight: bold; margin: 20px 0;">
+                Please participate by voting on this poll!
+              </p>
+            </div>
+          </div>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280;">
+            <p style="text-align: center; margin: 0;">This poll notification was sent from EventHost.</p>
+          </div>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('Resend poll email error:', error);
+      return false;
+    }
+
+    console.log('Poll email sent successfully:', data);
+    return true;
+  } catch (error) {
+    console.error('Error sending poll email:', error);
     return false;
   }
 }
