@@ -26,8 +26,20 @@ interface Poll {
   totalVotes?: number;
 }
 
+interface GuestList {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface User {
+  id: string;
+  email: string;
+}
+
 export function PollManager() {
   const [polls, setPolls] = useState<Poll[]>([]);
+  const [guestLists, setGuestLists] = useState<GuestList[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isVoteDialogOpen, setIsVoteDialogOpen] = useState(false);
@@ -38,6 +50,8 @@ export function PollManager() {
     options: ['', ''],
     allowMultipleChoices: false,
     endDate: '',
+    notifyGuestLists: [] as string[],
+    sendNotifications: true,
   });
   const [voteForm, setVoteForm] = useState({
     voterName: '',
@@ -56,6 +70,7 @@ export function PollManager() {
 
   useEffect(() => {
     fetchPolls();
+    fetchGuestLists();
   }, []);
 
   const fetchPolls = async () => {
@@ -72,6 +87,21 @@ export function PollManager() {
       console.error('Error fetching polls:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchGuestLists = async () => {
+    try {
+      const response = await fetch('/api/guest-lists', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setGuestLists(data);
+      }
+    } catch (error) {
+      console.error('Error fetching guest lists:', error);
     }
   };
 
@@ -120,6 +150,7 @@ export function PollManager() {
           options: validOptions,
           allowMultipleChoices: createForm.allowMultipleChoices,
           endDate: createForm.endDate,
+          notifyGuestLists: createForm.sendNotifications ? createForm.notifyGuestLists : [],
         }),
       });
 
@@ -131,6 +162,8 @@ export function PollManager() {
           options: ['', ''],
           allowMultipleChoices: false,
           endDate: '',
+          notifyGuestLists: [],
+          sendNotifications: true,
         });
         setIsCreateDialogOpen(false);
         toast({
@@ -515,6 +548,59 @@ export function PollManager() {
                     data-testid="input-poll-end-date"
                   />
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="sendNotifications"
+                    checked={createForm.sendNotifications}
+                    onCheckedChange={(checked) => 
+                      setCreateForm({ ...createForm, sendNotifications: checked as boolean })
+                    }
+                    data-testid="checkbox-send-notifications"
+                  />
+                  <Label htmlFor="sendNotifications">Send poll notification emails</Label>
+                </div>
+                {createForm.sendNotifications && (
+                  <div>
+                    <Label>Notify Guest Lists</Label>
+                    <div className="space-y-2 mt-2 max-h-40 overflow-y-auto">
+                      {guestLists.map((guestList) => (
+                        <div key={guestList.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`guestlist-${guestList.id}`}
+                            checked={createForm.notifyGuestLists.includes(guestList.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setCreateForm({
+                                  ...createForm,
+                                  notifyGuestLists: [...createForm.notifyGuestLists, guestList.id]
+                                });
+                              } else {
+                                setCreateForm({
+                                  ...createForm,
+                                  notifyGuestLists: createForm.notifyGuestLists.filter(id => id !== guestList.id)
+                                });
+                              }
+                            }}
+                            data-testid={`checkbox-guestlist-${guestList.id}`}
+                          />
+                          <Label htmlFor={`guestlist-${guestList.id}`}>
+                            {guestList.name}
+                            {guestList.description && (
+                              <span className="text-sm text-muted-foreground block">
+                                {guestList.description}
+                              </span>
+                            )}
+                          </Label>
+                        </div>
+                      ))}
+                      {guestLists.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          No guest lists available. Create guest lists first to notify users about polls.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>

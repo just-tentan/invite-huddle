@@ -1092,8 +1092,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Create new vote
         const vote = await storage.createPollVote({
-          ...voteData,
           pollId: req.params.id,
+          userId: voteData.userId,
+          voterEmail: voteData.voterEmail,
+          voterName: voteData.voterName,
+          selectedOptions: voteData.selectedOptions,
         });
         res.json(vote);
       }

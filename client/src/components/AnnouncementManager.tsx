@@ -22,8 +22,16 @@ interface Announcement {
   updatedAt: string;
 }
 
+interface Event {
+  id: string;
+  title: string;
+  startDateTime: string;
+  endDateTime?: string;
+}
+
 export function AnnouncementManager() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -31,7 +39,7 @@ export function AnnouncementManager() {
   const [createForm, setCreateForm] = useState({
     title: '',
     content: '',
-    targetAudience: 'all_users' as const,
+    targetAudience: 'all_users' as "all_users" | "event_attendees" | "specific_users",
     eventId: '',
   });
   const [editForm, setEditForm] = useState<{
@@ -48,6 +56,7 @@ export function AnnouncementManager() {
 
   useEffect(() => {
     fetchAnnouncements();
+    fetchEvents();
   }, []);
 
   const fetchAnnouncements = async () => {
@@ -64,6 +73,25 @@ export function AnnouncementManager() {
       console.error('Error fetching announcements:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEvents = async () => {
+    try {
+      const response = await fetch('/api/events', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Filter to upcoming events and sort by date
+        const upcomingEvents = data
+          .filter((event: Event) => new Date(event.startDateTime) >= new Date())
+          .sort((a: Event, b: Event) => new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime());
+        setEvents(upcomingEvents);
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
     }
   };
 
@@ -87,6 +115,7 @@ export function AnnouncementManager() {
           content: createForm.content,
           targetAudience: createForm.targetAudience,
           eventId: createForm.eventId || undefined,
+          sendEmail: true, // Send emails when creating announcement
         }),
       });
 
@@ -339,16 +368,32 @@ export function AnnouncementManager() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label htmlFor="eventId">Related Event ID (optional)</Label>
-                  <Input
-                    id="eventId"
-                    value={createForm.eventId}
-                    onChange={(e) => setCreateForm({ ...createForm, eventId: e.target.value })}
-                    placeholder="Enter event ID (optional)"
-                    data-testid="input-announcement-event-id"
-                  />
-                </div>
+                {(createForm.targetAudience === 'event_attendees') && (
+                  <div>
+                    <Label htmlFor="eventId">Select Event</Label>
+                    <Select
+                      value={createForm.eventId}
+                      onValueChange={(value) => setCreateForm({ ...createForm, eventId: value })}
+                    >
+                      <SelectTrigger data-testid="select-announcement-event">
+                        <SelectValue placeholder="Select an event" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {events.map((event) => (
+                          <SelectItem key={event.id} value={event.id}>
+                            {event.title} - {new Date(event.startDateTime).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>

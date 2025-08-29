@@ -42,6 +42,8 @@ const Dashboard = () => {
   const [host, setHost] = useState<Host | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'upcoming' | 'past' | 'cancelled'>('upcoming');
+  const [eventGroups, setEventGroups] = useState([]);
+  const [eventGroupFilter, setEventGroupFilter] = useState<string>('');
 
   useEffect(() => {
     if (user) {
