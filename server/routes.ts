@@ -961,13 +961,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const invitations = await storage.getInvitationsByEventId(announcementData.eventId);
           emailRecipients = invitations
             .filter(inv => inv.rsvpStatus === 'yes')
-            .map(inv => inv.email);
+            .map(inv => inv.email)
+            .filter((email): email is string => email !== null);
         } else if (announcementData.targetAudience === 'specific_users' && specificUserEmails) {
           emailRecipients = specificUserEmails;
         }
         
         // Remove duplicates and send emails
-        const uniqueRecipients = [...new Set(emailRecipients)];
+        const uniqueRecipients = Array.from(new Set(emailRecipients));
         if (uniqueRecipients.length > 0) {
           await sendAnnouncementEmail({
             to: uniqueRecipients,
@@ -1078,7 +1079,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Remove duplicates and send emails
-        const uniqueRecipients = [...new Set(emailRecipients)];
+        const uniqueRecipients = Array.from(new Set(emailRecipients));
         if (uniqueRecipients.length > 0) {
           await sendPollEmail({
             to: uniqueRecipients,
@@ -1087,6 +1088,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             options: poll.options,
             endDate: poll.endDate,
             hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
+            pollId: poll.id,
+            baseUrl: process.env.REPL_URL || `http://localhost:${process.env.PORT || 5000}` || '',
           });
         }
       }
@@ -1175,6 +1178,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const endedPoll = await storage.endPoll(req.params.id);
       res.json(endedPoll);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Email voting endpoint
+  app.get("/api/polls/:id/vote-email", async (req, res) => {
+    try {
+      const poll = await storage.getPollById(req.params.id);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+
+      if (poll.status !== 'active') {
+        return res.status(400).json({ error: "Poll is not active" });
+      }
+
+      if (new Date() > poll.endDate) {
+        return res.status(400).json({ error: "Poll has ended" });
+      }
+
+      const optionIndex = parseInt(req.query.option as string);
+      const voterEmail = req.query.voterEmail as string | undefined;
+
+      if (isNaN(optionIndex) || optionIndex < 0 || optionIndex >= poll.options.length) {
+        return res.status(400).json({ error: "Invalid option" });
+      }
+
+      if (!voterEmail || voterEmail === 'USER_EMAIL') {
+        // Redirect to poll page if no email provided
+        return res.redirect(`/polls/${req.params.id}`);
+      }
+
+      // Check if user has already voted
+      const existingVote = await storage.getUserPollVote(
+        req.params.id, 
+        undefined, 
+        voterEmail
+      );
+
+      if (existingVote) {
+        // Update existing vote
+        await storage.updatePollVote(existingVote.id, [optionIndex.toString()]);
+      } else {
+        // Create new vote
+        await storage.createPollVote({
+          pollId: req.params.id,
+          userId: undefined,
+          voterEmail: voterEmail,
+          voterName: undefined,
+          selectedOptions: [optionIndex.toString()],
+        });
+      }
+
+      // Redirect to a thank you page or poll results
+      res.redirect(`/polls/${req.params.id}?voted=true`);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

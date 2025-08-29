@@ -43,6 +43,8 @@ interface PollEmailParams {
   options: string[];
   endDate: Date;
   hostName?: string;
+  pollId: string;
+  baseUrl: string;
 }
 
 export async function sendCancellationEmail({
@@ -255,7 +257,9 @@ export async function sendPollEmail({
   description,
   options,
   endDate,
-  hostName
+  hostName,
+  pollId,
+  baseUrl
 }: PollEmailParams): Promise<boolean> {
   try {
     const formattedDate = endDate.toLocaleDateString('en-US', {
@@ -283,18 +287,29 @@ export async function sendPollEmail({
               <h2 style="color: #1e293b; margin: 0 0 15px 0;">${title}</h2>
               ${description ? `<p style="color: #374151; line-height: 1.6; margin-bottom: 20px; white-space: pre-line;">${description}</p>` : ''}
               
-              <h3 style="color: #059669; margin: 20px 0 15px 0;">Options:</h3>
-              <ul style="list-style: none; padding: 0;">
-                ${options.map(option => `<li style="background: #f3f4f6; margin: 8px 0; padding: 12px; border-radius: 4px; border-left: 4px solid #059669;">${option}</li>`).join('')}
-              </ul>
+              <h3 style="color: #059669; margin: 20px 0 15px 0;">Vote for your preferred option(s):</h3>
+              
+              <div style="text-align: center; margin: 20px 0;">
+                ${options.map((option, index) => 
+                  `<div style="margin: 10px 0;">
+                    <a href="${baseUrl}/api/polls/${pollId}/vote-email?option=${index}" 
+                       style="background-color: #059669; color: white; padding: 12px 20px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; min-width: 200px; text-align: center; margin: 5px;">
+                      ${option}
+                    </a>
+                  </div>`
+                ).join('')}
+              </div>
               
               <div style="background: #fef3c7; padding: 15px; border-radius: 6px; margin: 15px 0; text-align: center;">
                 <strong style="color: #92400e;">⏰ Poll ends: ${formattedDate}</strong>
               </div>
               
-              <p style="color: #374151; text-align: center; font-weight: bold; margin: 20px 0;">
-                Please participate by voting on this poll!
-              </p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${baseUrl}/polls/${pollId}" 
+                   style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+                  📊 View Full Poll Details
+                </a>
+              </div>
             </div>
           </div>
           
