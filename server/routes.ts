@@ -1089,7 +1089,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             endDate: poll.endDate,
             hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
             pollId: poll.id,
-            baseUrl: process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'https'}://${req.get('host') || 'localhost:5000'}`,
+            baseUrl: process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` : `${req.protocol || 'https'}://${req.get('host') || 'localhost:5000'}`,
           });
         }
       }
@@ -1203,7 +1203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             endDate: updatedPoll.endDate instanceof Date ? updatedPoll.endDate : new Date(updatedPoll.endDate),
             hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
             pollId: updatedPoll.id,
-            baseUrl: process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'https'}://${req.get('host') || 'localhost:5000'}`,
+            baseUrl: process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` : `${req.protocol || 'https'}://${req.get('host') || 'localhost:5000'}`,
           });
         }
       }
