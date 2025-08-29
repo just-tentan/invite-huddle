@@ -1200,7 +1200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             title: updatedPoll.title,
             description: updatedPoll.description,
             options: updatedPoll.options,
-            endDate: updatedPoll.endDate,
+            endDate: updatedPoll.endDate instanceof Date ? updatedPoll.endDate : new Date(updatedPoll.endDate),
             hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
             pollId: updatedPoll.id,
             baseUrl: process.env.REPL_URL || `https://${process.env.REPL_SLUG}-${process.env.REPL_OWNER}.replit.app` || `http://localhost:${process.env.PORT || 5000}`,
