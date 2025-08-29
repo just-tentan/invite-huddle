@@ -235,8 +235,13 @@ export function PollManager() {
   const openEditDialog = (poll: Poll) => {
     setSelectedPoll(poll);
     // Format the date for datetime-local input (YYYY-MM-DDTHH:MM)
-    const formatDateForInput = (dateString: string) => {
-      const date = new Date(dateString);
+    const formatDateForInput = (dateValue: string | Date) => {
+      const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date value:', dateValue);
+        return '';
+      }
       return date.toISOString().slice(0, 16);
     };
     
