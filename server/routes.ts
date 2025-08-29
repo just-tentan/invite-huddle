@@ -1089,7 +1089,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             endDate: poll.endDate,
             hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
             pollId: poll.id,
-            baseUrl: process.env.REPL_URL || `http://localhost:${process.env.PORT || 5000}` || '',
+            baseUrl: process.env.REPL_URL || `https://${process.env.REPL_SLUG}-${process.env.REPL_OWNER}.replit.app` || `http://localhost:${process.env.PORT || 5000}`,
           });
         }
       }
@@ -1159,6 +1159,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         res.json(vote);
       }
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/polls/:id", requireAuth, async (req: any, res) => {
+    try {
+      const poll = await storage.getPollById(req.params.id);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+
+      const host = await storage.getHostByUserId(req.user.id);
+      if (!host || poll.hostId !== host.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { sendEmail, notifyGuestListIds, ...updateData } = req.body;
+      const updatedPoll = await storage.updatePoll(req.params.id, updateData);
+      
+      // Send emails if requested
+      if (sendEmail && notifyGuestListIds && notifyGuestListIds.length > 0) {
+        let emailRecipients: string[] = [];
+        
+        for (const guestListId of notifyGuestListIds) {
+          const members = await storage.getGuestListMembers(guestListId);
+          emailRecipients.push(...members.map(m => m.email));
+        }
+        
+        // Remove duplicates and send emails
+        const uniqueRecipients = Array.from(new Set(emailRecipients));
+        if (uniqueRecipients.length > 0) {
+          await sendPollEmail({
+            to: uniqueRecipients,
+            title: updatedPoll.title,
+            description: updatedPoll.description,
+            options: updatedPoll.options,
+            endDate: updatedPoll.endDate,
+            hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
+            pollId: updatedPoll.id,
+            baseUrl: process.env.REPL_URL || `https://${process.env.REPL_SLUG}-${process.env.REPL_OWNER}.replit.app` || `http://localhost:${process.env.PORT || 5000}`,
+          });
+        }
+      }
+      
+      res.json(updatedPoll);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }

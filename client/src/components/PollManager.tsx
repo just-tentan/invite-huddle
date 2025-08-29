@@ -46,6 +46,7 @@ export function PollManager() {
   const [guestLists, setGuestLists] = useState<GuestList[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isVoteDialogOpen, setIsVoteDialogOpen] = useState(false);
   const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
   const [createForm, setCreateForm] = useState({
@@ -56,6 +57,15 @@ export function PollManager() {
     endDate: '',
     notifyGuestLists: [] as string[],
     sendNotifications: true,
+  });
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    options: ['', ''],
+    allowMultipleChoices: false,
+    endDate: '',
+    notifyGuestLists: [] as string[],
+    sendNotifications: false,
   });
   const [voteForm, setVoteForm] = useState({
     voterName: '',
@@ -220,6 +230,103 @@ export function PollManager() {
         variant: "destructive",
       });
     }
+  };
+
+  const openEditDialog = (poll: Poll) => {
+    setSelectedPoll(poll);
+    setEditForm({
+      title: poll.title,
+      description: poll.description || '',
+      options: [...poll.options],
+      allowMultipleChoices: poll.allowMultipleChoices,
+      endDate: poll.endDate,
+      notifyGuestLists: [],
+      sendNotifications: false,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditPoll = async () => {
+    if (!selectedPoll || !editForm.title.trim() || !editForm.endDate) {
+      toast({
+        title: "Error",
+        description: "Please fill in title and end date",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const validOptions = editForm.options.filter(option => option.trim() !== '');
+    if (validOptions.length < 2) {
+      toast({
+        title: "Error",
+        description: "Please provide at least 2 options",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/polls/${selectedPoll.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: editForm.title,
+          description: editForm.description || undefined,
+          options: validOptions,
+          allowMultipleChoices: editForm.allowMultipleChoices,
+          endDate: editForm.endDate,
+          sendEmail: editForm.sendNotifications,
+          notifyGuestListIds: editForm.sendNotifications ? editForm.notifyGuestLists : [],
+        }),
+      });
+
+      if (response.ok) {
+        await fetchPolls();
+        setIsEditDialogOpen(false);
+        toast({
+          title: "Poll Updated",
+          description: editForm.sendNotifications ? "Poll updated and notifications sent!" : "Poll updated successfully.",
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.error || "Failed to update poll",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const addEditOption = () => {
+    setEditForm(prev => ({
+      ...prev,
+      options: [...prev.options, '']
+    }));
+  };
+
+  const removeEditOption = (index: number) => {
+    if (editForm.options.length > 2) {
+      setEditForm(prev => ({
+        ...prev,
+        options: prev.options.filter((_, i) => i !== index)
+      }));
+    }
+  };
+
+  const updateEditOption = (index: number, value: string) => {
+    setEditForm(prev => ({
+      ...prev,
+      options: prev.options.map((opt, i) => i === index ? value : opt)
+    }));
   };
 
   const handleConvertToEvent = async () => {
@@ -704,15 +811,26 @@ export function PollManager() {
                       </Button>
                     )}
                     {poll.status === 'active' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEndPoll(poll)}
-                        data-testid={`button-end-${poll.id}`}
-                      >
-                        <Square className="h-3 w-3 mr-1" />
-                        End
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditDialog(poll)}
+                          data-testid={`button-edit-${poll.id}`}
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEndPoll(poll)}
+                          data-testid={`button-end-${poll.id}`}
+                        >
+                          <Square className="h-3 w-3 mr-1" />
+                          End
+                        </Button>
+                      </>
                     )}
                     {(poll.status === 'ended' || (poll.status === 'active' && isPollExpired(poll.endDate))) && (
                       <Button
@@ -836,6 +954,179 @@ export function PollManager() {
             </Button>
             <Button onClick={handleVote} data-testid="button-confirm-vote">
               Submit Vote
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Poll Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Poll</DialogTitle>
+            <DialogDescription>
+              Update poll details and optionally resend notifications
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-title">Poll Title</Label>
+              <Input
+                id="edit-title"
+                value={editForm.title}
+                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                placeholder="Enter poll title"
+                data-testid="input-edit-poll-title"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-description">Description (optional)</Label>
+              <Textarea
+                id="edit-description"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                placeholder="Enter poll description"
+                rows={3}
+                data-testid="textarea-edit-poll-description"
+              />
+            </div>
+            <div>
+              <Label>Poll Options</Label>
+              <div className="space-y-2">
+                {editForm.options.map((option, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      value={option}
+                      onChange={(e) => updateEditOption(index, e.target.value)}
+                      placeholder={`Option ${index + 1}`}
+                      data-testid={`input-edit-option-${index}`}
+                    />
+                    {editForm.options.length > 2 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeEditOption(index)}
+                        data-testid={`button-remove-edit-option-${index}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addEditOption}
+                  data-testid="button-add-edit-option"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Option
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="edit-endDate">End Date & Time</Label>
+              <Input
+                id="edit-endDate"
+                type="datetime-local"
+                value={editForm.endDate}
+                onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+                data-testid="input-edit-end-date"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="edit-allowMultipleChoices"
+                checked={editForm.allowMultipleChoices}
+                onCheckedChange={(checked) => 
+                  setEditForm({ ...editForm, allowMultipleChoices: checked as boolean })
+                }
+                data-testid="checkbox-edit-multiple-choices"
+              />
+              <Label htmlFor="edit-allowMultipleChoices">Allow multiple choices</Label>
+            </div>
+            
+            {/* Email notification section */}
+            <div className="border-t pt-4">
+              <div className="flex items-center space-x-2 mb-3">
+                <Checkbox
+                  id="edit-sendNotifications"
+                  checked={editForm.sendNotifications}
+                  onCheckedChange={(checked) => 
+                    setEditForm({ ...editForm, sendNotifications: checked as boolean })
+                  }
+                  data-testid="checkbox-edit-send-notifications"
+                />
+                <Label htmlFor="edit-sendNotifications">Resend email notifications after update</Label>
+              </div>
+              
+              {editForm.sendNotifications && (
+                <div>
+                  <Label>Select guest lists to notify:</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between mt-2"
+                        data-testid="button-edit-select-guest-lists"
+                      >
+                        {editForm.notifyGuestLists.length === 0
+                          ? "Select guest lists..."
+                          : `${editForm.notifyGuestLists.length} list${editForm.notifyGuestLists.length !== 1 ? 's' : ''} selected`}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Search guest lists..." />
+                        <CommandEmpty>No guest lists found.</CommandEmpty>
+                        <CommandList>
+                          <CommandGroup>
+                            {guestLists.map((list) => (
+                              <CommandItem
+                                key={list.id}
+                                onSelect={() => {
+                                  setEditForm(prev => ({
+                                    ...prev,
+                                    notifyGuestLists: prev.notifyGuestLists.includes(list.id)
+                                      ? prev.notifyGuestLists.filter(id => id !== list.id)
+                                      : [...prev.notifyGuestLists, list.id]
+                                  }));
+                                }}
+                                data-testid={`command-item-edit-guest-list-${list.id}`}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    editForm.notifyGuestLists.includes(list.id) ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {list.name}
+                                {list.description && (
+                                  <span className="text-muted-foreground ml-2">
+                                    - {list.description}
+                                  </span>
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditPoll} data-testid="button-confirm-edit-poll">
+              Update Poll
             </Button>
           </DialogFooter>
         </DialogContent>
