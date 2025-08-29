@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
-import { insertUserSchema, insertEventSchema, updateHostProfileSchema, insertEventGroupSchema, insertGuestListSchema, insertGuestListMemberSchema, insertEventGroupGuestListSchema, insertEventCollaboratorSchema, updateEventCollaboratorSchema, insertAnnouncementSchema, insertPollSchema, insertPollVoteSchema } from "@shared/schema";
+import { insertUserSchema, insertEventSchema, updateHostProfileSchema, insertEventGroupSchema, insertGuestListSchema, insertGuestListMemberSchema, insertEventGroupGuestListSchema, insertEventCollaboratorSchema, updateEventCollaboratorSchema, insertAnnouncementSchema, insertPollSchema, updatePollSchema, insertPollVoteSchema } from "@shared/schema";
 import { sendInvitationEmail, sendCancellationEmail, sendAnnouncementEmail, sendPollEmail } from "./email";
 import { ObjectStorageService } from "./objectStorage";
 
@@ -1178,12 +1178,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { sendEmail, notifyGuestListIds, ...updateData } = req.body;
       
-      // Convert endDate string to Date object if it exists
-      if (updateData.endDate && typeof updateData.endDate === 'string') {
-        updateData.endDate = new Date(updateData.endDate);
-      }
+      // Validate and transform the update data
+      const validatedData = updatePollSchema.parse(updateData);
       
-      const updatedPoll = await storage.updatePoll(req.params.id, updateData);
+      const updatedPoll = await storage.updatePoll(req.params.id, validatedData);
       
       // Send emails if requested
       if (sendEmail && notifyGuestListIds && notifyGuestListIds.length > 0) {

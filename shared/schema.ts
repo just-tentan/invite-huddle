@@ -265,6 +265,19 @@ export const insertPollSchema = createInsertSchema(polls).pick({
   endDate: z.string().transform((str) => new Date(str)),
 });
 
+export const updatePollSchema = createInsertSchema(polls).pick({
+  title: true,
+  description: true,
+  options: true,
+  allowMultipleChoices: true,
+  endDate: true,
+}).partial().extend({
+  endDate: z.union([z.string(), z.date()]).optional().transform((val) => {
+    if (!val) return undefined;
+    return typeof val === 'string' ? new Date(val) : val;
+  }),
+});
+
 export const insertPollVoteSchema = createInsertSchema(pollVotes).pick({
   userId: true,
   voterEmail: true,
@@ -298,6 +311,7 @@ export type InsertEventCollaborator = z.infer<typeof insertEventCollaboratorSche
 export type UpdateEventCollaborator = z.infer<typeof updateEventCollaboratorSchema>;
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type InsertPoll = z.infer<typeof insertPollSchema>;
+export type UpdatePoll = z.infer<typeof updatePollSchema>;
 export type InsertPollVote = z.infer<typeof insertPollVoteSchema>;
 
 export type User = typeof users.$inferSelect;
