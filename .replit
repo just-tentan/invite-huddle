@@ -40,3 +40,10 @@ integrations = ["javascript_sendgrid:1.0.0", "javascript_websocket:1.0.0", "java
 
 [objectStorage]
 defaultBucketID = "replit-objstore-f9c5dc46-d835-49d3-9c79-6abbbcb51e96"
+
+[userenv]
+
+[userenv.shared]
+SUPABASE_URL = "https://mdotgsmbeajhktmscqzc.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kb3Rnc21iZWFqaGt0bXNjcXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NzUwMDIsImV4cCI6MjA4NzQ1MTAwMn0.PTABbT-QbnZyNNKT2zbo1xiUkl4jzy0xtdPkcXSlgzg"
+SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kb3Rnc21iZWFqaGt0bXNjcXpjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3NTAwMiwiZXhwIjoyMDg3NDUxMDAyfQ.r6lgY4YniW_dgx92hEbnCS2lWqA-HiYuY-UnUtzQcRI"
