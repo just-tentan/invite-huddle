@@ -1,25 +1,13 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/index.ts",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["server/**", "shared/**"]
-      }
-    },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist/public"
-      }
-    }
-  ],
+  "framework": null,
+  "installCommand": "npm install",
+  "buildCommand": "npx vite build && npx esbuild server/vercel-entry.ts --platform=node --packages=external --bundle --format=esm --outfile=api/index.mjs --alias:@shared=./shared",
+  "outputDirectory": "dist/public",
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "/api/index.mjs"
     },
     {
       "source": "/((?!api/).*)",
