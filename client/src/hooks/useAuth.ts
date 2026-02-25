@@ -16,6 +16,12 @@ export const useAuth = () => {
   }, []);
 
   const checkAuth = async () => {
+    if (!document.cookie.includes("connect.sid")) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/auth/me', {
         credentials: 'include',
