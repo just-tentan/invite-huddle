@@ -13,13 +13,16 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-const server = await registerRoutes(app);
-
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  const status = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-  console.error("Vercel Express Error:", err);
-  res.status(status).json({ message });
+const initPromise = registerRoutes(app).then(() => {
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+    console.error("Vercel Express Error:", err);
+    res.status(status).json({ message });
+  });
 });
 
-export default app;
+export default async function handler(req: any, res: any) {
+  await initPromise;
+  return app(req, res);
+}
