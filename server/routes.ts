@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
+import pg from "pg";
 import { storage } from "./storage";
 import { insertUserSchema, insertEventSchema, updateHostProfileSchema, insertEventGroupSchema, insertGuestListSchema, insertGuestListMemberSchema, insertEventGroupGuestListSchema, insertEventCollaboratorSchema, updateEventCollaboratorSchema, insertAnnouncementSchema, insertPollSchema, updatePollSchema, insertPollVoteSchema } from "@shared/schema";
 import { sendInvitationEmail, sendCancellationEmail, sendAnnouncementEmail, sendPollEmail } from "./email";
@@ -39,7 +40,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.set("trust proxy", 1);
   app.use(session({
     store: new PostgresSessionStore({
-      conString: process.env.DATABASE_URL,
+      pool: new pg.Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false },
+        max: 2
+      }),
       createTableIfMissing: true
     }),
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',

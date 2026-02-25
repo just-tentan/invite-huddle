@@ -6,15 +6,6 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Health check for production
-app.get("/api/health", (_req, res) => {
-  res.json({ 
-    status: "ok", 
-    env: process.env.NODE_ENV,
-    time: new Date().toISOString()
-  });
-});
-
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -50,7 +41,7 @@ const server = await registerRoutes(app);
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
-  console.error('Express Error:', err);
+  console.error("Express Error:", err);
   res.status(status).json({ message });
 });
 
@@ -61,14 +52,12 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 const port = 5000;
-if (process.env.NODE_ENV !== "production") {
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
-}
+server.listen({
+  port,
+  host: "0.0.0.0",
+  reusePort: true,
+}, () => {
+  log(`serving on port ${port}`);
+});
 
 export default app;
