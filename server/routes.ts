@@ -27,12 +27,15 @@ declare module "express-session" {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Session configuration
+  app.set("trust proxy", 1);
   app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
     resave: false,
     saveUninitialized: false,
+    proxy: true, // Required for Vercel
     cookie: {
-      secure: false, // Set to true in production with HTTPS
+      secure: process.env.NODE_ENV === "production", // true in production
+      sameSite: "lax",
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
   }));
@@ -176,7 +179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             invitations.push(invitation);
             
             // Send invitation email
-            const baseUrlForLinks = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`;
+            const baseUrlForLinks = process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`;
             const inviteUrl = `${baseUrlForLinks}/invite/${invitation.token}`;
             const formatDate = (dateString: Date) => {
               return new Date(dateString).toLocaleDateString('en-US', {
@@ -201,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 guestName: guest.name || undefined,
                 hostName: host.preferredName || host.firstName || host.name || undefined,
                 token: invitation.token,
-                baseUrl: process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`
+                baseUrl: process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`
               });
             } catch (error) {
               console.error(`Failed to send invitation to ${guest.email}:`, error);
@@ -525,7 +528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const invitation of pendingInvitations) {
         if (invitation.email) {
-          const baseUrlForLinks = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`;
+          const baseUrlForLinks = process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`;
           const inviteUrl = `${baseUrlForLinks}/invite/${invitation.token}`;
           const formatDate = (dateString: Date) => {
             return new Date(dateString).toLocaleDateString('en-US', {
@@ -550,7 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               guestName: invitation.name || undefined,
               hostName: host.name || undefined,
               token: invitation.token,
-              baseUrl: process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`
+              baseUrl: process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`
             });
             sentCount++;
           } catch (error) {
@@ -622,7 +625,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               guestName: guest.name || undefined,
               hostName: host.name || undefined,
               token: invitation.token,
-              baseUrl: process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`
+              baseUrl: process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`
             });
           } catch (error) {
             console.error(`Failed to send invitation to ${guest.email}:`, error);
