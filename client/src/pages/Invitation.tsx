@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'wouter';
 import { Calendar, MapPin, Clock, Users, CheckCircle, X } from 'lucide-react';
+import { AddToCalendar } from '@/components/AddToCalendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -246,6 +247,15 @@ const Invitation = () => {
                   <span className="text-sm">{event.location}</span>
                 </div>
               )}
+            </div>
+
+            <div className="pt-2">
+              <AddToCalendar
+                title={event.title}
+                description={event.description}
+                startDateTime={event.dateTime}
+                location={event.location}
+              />
             </div>
           </CardContent>
         </Card>

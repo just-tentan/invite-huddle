@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'wouter';
 import { Link } from 'wouter';
 import { Calendar, MapPin, Users, MessageCircle, ArrowLeft, Copy, CheckCircle, Mail, Plus, Send, Minus, Edit, Trash2, X, MoreVertical, UserMinus, Ban, MessageSquareOff } from 'lucide-react';
+import { AddToCalendar } from '@/components/AddToCalendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -660,6 +661,17 @@ const EventManage = () => {
                       <span className="text-sm">{event.location}</span>
                     </div>
                   )}
+                </div>
+
+                <div className="pt-2">
+                  <AddToCalendar
+                    title={event.title}
+                    description={event.description}
+                    startDateTime={event.startDateTime}
+                    endDateTime={event.endDateTime}
+                    location={event.location}
+                    isAllDay={event.isAllDay}
+                  />
                 </div>
               </CardContent>
             </Card>
