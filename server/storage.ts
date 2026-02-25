@@ -120,6 +120,10 @@ export class DatabaseStorage implements IStorage {
       password: hashedPassword,
     }).returning();
     
+    if (!result[0]) {
+      throw new Error("User creation failed");
+    }
+
     // Also create a host profile
     await this.createHost(result[0].id, user.email);
     

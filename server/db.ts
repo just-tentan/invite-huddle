@@ -5,8 +5,8 @@ import * as schema from "@shared/schema";
 // Create the connection
 const connectionString = process.env.DATABASE_URL!;
 const client = postgres(connectionString, {
-  ssl: "require",
-  max: 10,
+  ssl: { rejectUnauthorized: false },
+  max: 1, // Limited connections for serverless
   idle_timeout: 20,
   connect_timeout: 10,
 });

@@ -1,10 +1,13 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import pgSession from "connect-pg-simple";
 import { storage } from "./storage";
 import { insertUserSchema, insertEventSchema, updateHostProfileSchema, insertEventGroupSchema, insertGuestListSchema, insertGuestListMemberSchema, insertEventGroupGuestListSchema, insertEventCollaboratorSchema, updateEventCollaboratorSchema, insertAnnouncementSchema, insertPollSchema, updatePollSchema, insertPollVoteSchema } from "@shared/schema";
 import { sendInvitationEmail, sendCancellationEmail, sendAnnouncementEmail, sendPollEmail } from "./email";
 import { ObjectStorageService } from "./objectStorage";
+
+const PostgresSessionStore = pgSession(session);
 
 // Utility functions
 const formatDate = (dateString: Date) => {
@@ -18,6 +21,12 @@ const formatDate = (dateString: Date) => {
   });
 };
 
+const getBaseUrl = (req: any) => {
+  if (process.env.REPLIT_DOMAINS) return `https://${process.env.REPLIT_DOMAINS}`;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return `${req.protocol}://${req.get('host')}`;
+};
+
 // Session middleware setup
 declare module "express-session" {
   interface SessionData {
@@ -29,12 +38,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Session configuration
   app.set("trust proxy", 1);
   app.use(session({
+    store: new PostgresSessionStore({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: true
+    }),
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
     resave: false,
     saveUninitialized: false,
-    proxy: true, // Required for Vercel
+    proxy: true,
     cookie: {
-      secure: process.env.NODE_ENV === "production", // true in production
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
@@ -69,7 +82,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ user: { id: user.id, email: user.email } });
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      console.error('Signup error:', error);
+      res.status(error.status || 500).json({ error: error.message || "Signup failed" });
     }
   });
 
@@ -1092,7 +1106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             endDate: poll.endDate,
             hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
             pollId: poll.id,
-            baseUrl: process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` : `${req.protocol || 'https'}://${req.get('host') || 'localhost:5000'}`,
+            baseUrl: getBaseUrl(req),
           });
         }
       }
