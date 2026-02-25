@@ -520,7 +520,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createPollVote(data: InsertPollVote): Promise<PollVote> {
-    const result = await db.insert(pollVotes).values(data).returning();
+    const result = await db.insert(pollVotes).values({
+      pollId: data.pollId,
+      userId: data.userId || null,
+      voterEmail: data.voterEmail || null,
+      voterName: data.voterName || null,
+      selectedOptions: data.selectedOptions,
+    }).returning();
     return result[0];
   }
   

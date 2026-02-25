@@ -1087,7 +1087,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await sendPollEmail({
             to: uniqueRecipients,
             title: poll.title,
-            description: poll.description,
+            description: poll.description || undefined,
             options: poll.options,
             endDate: poll.endDate,
             hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
@@ -1155,9 +1155,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create new vote
         const vote = await storage.createPollVote({
           pollId: req.params.id,
-          userId: voteData.userId,
-          voterEmail: voteData.voterEmail,
-          voterName: voteData.voterName,
+          userId: voteData.userId || null,
+          voterEmail: voteData.voterEmail || null,
+          voterName: voteData.voterName || null,
           selectedOptions: voteData.selectedOptions,
         });
         res.json(vote);
@@ -1278,9 +1278,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create new vote
         await storage.createPollVote({
           pollId: req.params.id,
-          userId: undefined,
-          voterEmail: voterEmail,
-          voterName: undefined,
+          userId: null,
+          voterEmail: voterEmail || null,
+          voterName: null,
           selectedOptions: [optionIndex.toString()],
         });
       }
