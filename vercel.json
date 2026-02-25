@@ -5,7 +5,9 @@
   "buildCommand": "npm run build && npx esbuild server/vercel-entry.ts --platform=node --packages=external --bundle --format=esm --outfile=api/index.mjs --alias:@shared=./shared",
   "outputDirectory": "dist/public",
   "functions": {
-    "api/index.mjs": {}
+    "api/index.mjs": {
+      "maxDuration": 30
+    }
   },
   "rewrites": [
     {
