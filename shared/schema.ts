@@ -279,6 +279,7 @@ export const updatePollSchema = createInsertSchema(polls).pick({
 });
 
 export const insertPollVoteSchema = createInsertSchema(pollVotes).pick({
+  pollId: true,
   userId: true,
   voterEmail: true,
   voterName: true,
