@@ -2,7 +2,7 @@
   "version": 2,
   "framework": null,
   "installCommand": "npm install",
-  "buildCommand": "npx vite build && npx esbuild server/vercel-entry.ts --platform=node --packages=external --bundle --format=esm --outfile=api/index.mjs --alias:@shared=./shared",
+  "buildCommand": "npm run build && npx esbuild server/vercel-entry.ts --platform=node --packages=external --bundle --format=esm --outfile=api/index.mjs --alias:@shared=./shared",
   "outputDirectory": "dist/public",
   "rewrites": [
     {
