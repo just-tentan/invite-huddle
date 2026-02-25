@@ -1201,7 +1201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await sendPollEmail({
             to: uniqueRecipients,
             title: updatedPoll.title,
-            description: updatedPoll.description,
+            description: updatedPoll.description || undefined,
             options: updatedPoll.options,
             endDate: updatedPoll.endDate instanceof Date ? updatedPoll.endDate : new Date(updatedPoll.endDate),
             hostName: host.preferredName || `${host.firstName} ${host.lastName}`.trim() || undefined,
